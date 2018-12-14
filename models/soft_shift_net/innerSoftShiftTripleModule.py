@@ -44,6 +44,8 @@ class InnerSoftShiftTripleModule(nn.Module):
             non_mask_indexes = (flag == 0).nonzero()
             ctx.ind_lst[idx][mask_indexes, non_mask_indexes.t()] = cosine_softmax
 
+            #print(torch.sum(ctx.ind_lst[idx][mask_indexes[0]])) #IT SHOULD GIVE 1.0
+
             # GET FINAL SHIFT FEATURE
             shift_masked_all[idx] = Nonparm._paste(latter_windows, ctx.ind_lst[idx], i_2, i_3, i_1, i_4)
 
