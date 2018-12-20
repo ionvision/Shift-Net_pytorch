@@ -9,17 +9,21 @@ class ShiftNetModel(BaseModel):
     def name(self):
         return 'ShiftNetModel'
 
-
-    def create_random_mask(self):
-        if self.mask_type == 'random':
+    def create_random_mask(self, batch_size):
+        masks = []
+        for i in range(batch_size):
             if self.opt.mask_sub_type == 'fractal':
                 mask = util.create_walking_mask ()  # create an initial random mask.
+
 
             elif self.opt.mask_sub_type == 'rect':
                 mask = util.create_rand_mask ()
 
             elif self.opt.mask_sub_type == 'island':
                 mask = util.wrapper_gmask (self.opt)
+            masks.append(mask)
+        if batch_size > 1:
+            return torch.cat(masks, 0)
         return mask
 
     def initialize(self, opt):
@@ -27,7 +31,8 @@ class ShiftNetModel(BaseModel):
         self.opt = opt
         self.isTrain = opt.isTrain
         # specify the training losses you want to print out. The program will call base_model.get_current_losses
-        self.loss_names = ['G_GAN', 'G_L1', 'D']
+        #self.loss_names = ['G_GAN', 'G_L1', 'D', 'mask', 'out_mask', 'alpha']
+        self.loss_names = ['G_GAN', 'G_cons', 'D', 'mask_L2', 'mask_L1', 'outmask_L1']
         # specify the images you want to save/display. The program will call base_model.get_current_visuals
         self.visual_names = ['real_A', 'fake_B', 'real_B']
         # specify the models you want to save to the disk. The program will call base_model.save_networks and base_model.load_networks
@@ -53,7 +58,7 @@ class ShiftNetModel(BaseModel):
             assert opt.fixed_mask == 1, "Center mask must be fixed mask!"
 
         if self.mask_type == 'random':
-            self.create_random_mask()
+            self.create_random_mask(self.opt.batchSize)
 
         self.wgan_gp = False
         # added for wgan-gp
@@ -91,6 +96,7 @@ class ShiftNetModel(BaseModel):
             # define loss functions
             self.criterionGAN = networks.GANLoss(gan_type=opt.gan_type).to(self.device)
             self.criterionL1 = torch.nn.L1Loss()
+            self.criterionL2 = torch.nn.MSELoss()
 
             # initialize optimizers
             self.schedulers = []
@@ -116,7 +122,11 @@ class ShiftNetModel(BaseModel):
 
         self.print_networks(opt.verbose)
 
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+
     def set_input(self, input):
+
         real_A = input['A'].to(self.device)
         real_B = input['B'].to(self.device)
 
@@ -128,11 +138,13 @@ class ShiftNetModel(BaseModel):
                 self.mask_global[:, :, int(self.opt.fineSize/4) + self.opt.overlap : int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap,\
                                     int(self.opt.fineSize/4) + self.opt.overlap: int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap] = 1
             elif self.opt.mask_type == 'random':
-                self.mask_global = self.create_random_mask().type_as(self.mask_global)
+                self.mask_global = self.create_random_mask(real_A.size(0)).type_as(self.mask_global)
             else:
                 raise ValueError("Mask_type [%s] not recognized." % self.opt.mask_type)
         else:
-            self.mask_global = self.create_random_mask().type_as(self.mask_global)
+            self.mask_global = self.create_random_mask(real_A.size(0)).type_as(self.mask_global)
+
+        #print('set_input', self.mask_global.shape)
 
         self.set_latent_mask(self.mask_global, 3, self.opt.threshold)
 
@@ -144,9 +156,9 @@ class ShiftNetModel(BaseModel):
 
         if self.opt.add_mask2input:
             # make it 4 dimensions.
+
             # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
-            real_A = torch.cat((real_A, (1 - self.mask_global).expand(self.opt.batchSize, 1, \
-                                     self.opt.fineSize, self.opt.fineSize).type_as(real_A)), dim=1)
+            real_A = torch.cat((real_A, self.mask_global.float()), dim=1)
 
         self.real_A = real_A
         self.real_B = real_B
@@ -165,6 +177,12 @@ class ShiftNetModel(BaseModel):
         real_A.narrow(1,1,1).masked_fill_(mask, 0.)#2*104.0/255.0 - 1.0
         real_A.narrow(1,2,1).masked_fill_(mask, 0.)#2*117.0/255.0 - 1.0
 
+        if self.opt.add_mask2input:
+            # make it 4 dimensions.
+            # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
+
+            real_A = torch.cat((real_A, self.mask_global.float()), dim=1)
+
         self.real_A = real_A
         self.real_B = real_B
         self.image_paths = input['A_paths']       
@@ -178,8 +196,7 @@ class ShiftNetModel(BaseModel):
             if self.opt.add_mask2input:
                 # make it 4 dimensions.
                 # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
-                real_B = torch.cat([self.real_B, (1 - self.mask_global).expand(self.opt.batchSize, 1, \
-                           self.opt.fineSize, self.opt.fineSize).type_as(self.real_B)], dim=1)
+                real_B = torch.cat((self.real_B, self.mask_global.float()), dim=1)
             else:
                 real_B = self.real_B
             self.netG(real_B) # input ground truth
@@ -252,14 +269,17 @@ class ShiftNetModel(BaseModel):
                 self.loss_G_GAN =  (self.criterionGAN (self.pred_real - torch.mean(self.pred_fake), False) \
                                + self.criterionGAN (self.pred_fake - torch.mean(self.pred_real), True)) / 2.
 
+        self.loss_G_cons = 0
+        self.loss_mask_L2 = self.criterionL2(self.mask_global.float() *self.fake_B, self.real_B)
+        self.loss_mask_L1 = self.criterionL1(self.mask_global.float() * self.fake_B, self.real_B)
+        self.loss_outmask_L1 = self.criterionL1((1 - self.mask_global.float()) * self.fake_B, self.real_B)
 
-        self.loss_G_L1 = 0
-        self.loss_G_L1 += self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_A
+        self.loss_G_cons += (self.loss_mask_L2 + self.loss_mask_L1 + self.loss_outmask_L1)* self.opt.lambda_A
 
         if self.wgan_gp:
-            self.loss_G = self.loss_G_L1 - self.loss_G_GAN * self.opt.gan_weight
+            self.loss_G = self.loss_G_cons - self.loss_G_GAN * self.opt.gan_weight
         else:
-            self.loss_G = self.loss_G_L1 + self.loss_G_GAN * self.opt.gan_weight
+            self.loss_G = self.loss_G_cons + self.loss_G_GAN * self.opt.gan_weight
 
 
         # Third add additional netG contraint loss!

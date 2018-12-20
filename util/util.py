@@ -11,6 +11,8 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 from skimage.transform import resize
+from torch.nn.functional import interpolate
+#from matplotlib import pyplot as plt
 
 def create_masks(opt, N=10):
     masks = []
@@ -213,41 +215,42 @@ def create_mask():
 # Return: ByteTensor
 def cal_feat_mask(inMask, conv_layers, threshold):
     assert inMask.dim() == 4, "mask must be 4 dimensions"
-    assert inMask.size(0) == 1, "the first dimension must be 1 for mask"
-    inMask = inMask.float()
-    convs = []
-    for id_net in range(conv_layers):
-        conv = nn.Conv2d(1,1,4,2,1, bias=False)
-        conv.weight.data.fill_(1/16.0) # 16.0 not 16
-        convs.append(conv)
-    lnet = nn.Sequential(*convs)
-    if inMask.is_cuda:
-        lnet = lnet.cuda()
-    output = lnet(inMask)
-    output = (output > threshold).float().mul_(1)
+    w = inMask.size(-1)
+    w_out = w//(2**conv_layers)
+    #print(inMask.shape)
+    inMask = interpolate(inMask.float(), size=w_out, mode='bilinear')
+
+    #for m in inMask:
+    #    plt.imshow(torch.squeeze(m).cpu().numpy())
+    #    plt.show()
+
+    output = (inMask > threshold).float().mul_(1)
 
     return output.data.byte()
 
 def cal_flag_given_mask_thred(img, mask, patch_size, stride, mask_thred):
     assert img.dim() == 3, 'img has to be 3 dimenison!'
-    assert mask.dim() == 2, 'mask has to be 2 dimenison!'
     dim = img.dim()
     _, H, W = img.size(dim - 3), img.size(dim - 2), img.size(dim - 1)
     nH = int(math.floor((H - patch_size) / stride + 1))
     nW = int(math.floor((W - patch_size) / stride + 1))
     N = nH * nW
+    batch_size = mask.size(0)
+    flag = torch.zeros(batch_size, N).long()
+    #print(batch_size)
+    for k in range(batch_size):
+        #print(k)
+        for i in range(N):
+            h = int(math.floor(i / nW))
+            w = int(math.floor(i % nW))
+            mask_tmp = mask[k, h * stride:h * stride + patch_size,
+                       w * stride:w * stride + patch_size]
 
-    flag = torch.zeros(N).long()
-    for i in range(N):
-        h = int(math.floor(i / nW))
-        w = int(math.floor(i % nW))
-        mask_tmp = mask[h * stride:h * stride + patch_size,
-                   w * stride:w * stride + patch_size]
-
-        if torch.sum(mask_tmp) < mask_thred:
-            pass
-        else:
-            flag[i] = 1
+            if torch.sum(mask_tmp) < mask_thred:
+                pass
+            else:
+                flag[k, i] = 1
+        #print(torch.sum(flag[k]))
     return flag
 
 

@@ -26,8 +26,6 @@ class AcceleratedInnerShiftTripleFunction(torch.autograd.Function):
         latter_all = input.narrow(1, c//2, c//2) ### encoder feature
         shift_masked_all = torch.Tensor(former_all.size()).type_as(former_all) # addition feature
 
-        assert mask.dim() == 2, "Mask dimension must be 2"
-
         if torch.cuda.is_available:
             flag = flag.cuda()
 
@@ -35,18 +33,19 @@ class AcceleratedInnerShiftTripleFunction(torch.autograd.Function):
         Nonparm = Modified_NonparametricShift()
 
         for idx in range(ctx.bz):
+            #print(flag[idx].shape)
             latter = latter_all.narrow(0, idx, 1) ### encoder feature
             former = former_all.narrow(0, idx, 1) ### decoder feature
 
             #GET COSINE, RESHAPED LATTER AND ITS INDEXES
-            cosine, latter_windows, i_2, i_3, i_1, i_4 = Nonparm.cosine_similarity(former.clone().squeeze(), latter.clone().squeeze(), 1, stride, flag)
+            cosine, latter_windows, i_2, i_3, i_1, i_4 = Nonparm.cosine_similarity(former.clone().squeeze(), latter.clone().squeeze(), 1, stride, flag[idx])
 
             ## GET INDEXES THAT MAXIMIZE COSINE SIMILARITY
             _, indexes = torch.max(cosine, dim=1)
 
             # SET  TRANSITION MATRIX
-            mask_indexes = (flag == 1).nonzero()
-            non_mask_indexes = (flag == 0).nonzero()[indexes]
+            mask_indexes = (flag[idx] == 1).nonzero()
+            non_mask_indexes = (flag[idx] == 0).nonzero()[indexes]
             ctx.ind_lst[idx][tuple((mask_indexes, non_mask_indexes))] = 1
 
             #print(torch.sum(ctx.ind_lst[idx])) # IT SHOULD GIVE mask_indexes.size(0)

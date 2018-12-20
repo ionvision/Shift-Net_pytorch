@@ -20,6 +20,8 @@ for epoch in range(opt.epoch_count, opt.niter + opt.niter_decay + 1):
     iter_data_time = time.time()
     epoch_iter = 0
 
+    model.set_epoch(epoch)
+
     for i, data in enumerate(dataset):
         iter_start_time = time.time()
         if total_steps % opt.print_freq == 0:
