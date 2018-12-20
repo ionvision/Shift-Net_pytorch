@@ -230,12 +230,16 @@ def cal_feat_mask(inMask, conv_layers, threshold):
 
 def cal_flag_given_mask_thred(img, mask, patch_size, stride, mask_thred):
     assert img.dim() == 3, 'img has to be 3 dimenison!'
+    if mask.dim() == 2:
+        mask = mask.unsqueeze(0)
     dim = img.dim()
     _, H, W = img.size(dim - 3), img.size(dim - 2), img.size(dim - 1)
     nH = int(math.floor((H - patch_size) / stride + 1))
     nW = int(math.floor((W - patch_size) / stride + 1))
     N = nH * nW
     batch_size = mask.size(0)
+    #print(mask.shape)
+    #print(batch_size)
     flag = torch.zeros(batch_size, N).long()
     #print(batch_size)
     for k in range(batch_size):
