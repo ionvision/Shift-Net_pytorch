@@ -1,13 +1,14 @@
 #-*-coding:utf-8-*-
 from torch.nn import init
 from torch.optim import lr_scheduler
-
+import util.util as util
 
 from .modules import *
 
 ###############################################################################
 # Functions
 ###############################################################################
+@util.args_displayer
 def get_norm_layer(norm_type='instance'):
     if norm_type == 'batch':
         norm_layer = functools.partial(nn.BatchNorm2d, affine=True)
@@ -19,7 +20,7 @@ def get_norm_layer(norm_type='instance'):
         raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
     return norm_layer
 
-
+@util.args_displayer
 def get_scheduler(optimizer, opt):
     if opt.lr_policy == 'lambda':
         def lambda_rule(epoch):
@@ -35,7 +36,6 @@ def get_scheduler(optimizer, opt):
     else:
         return NotImplementedError('learning rate policy [%s] is not implemented', opt.lr_policy)
     return scheduler
-
 
 def init_weights(net, init_type='normal', gain=0.02):
     def init_func(m):
@@ -60,7 +60,6 @@ def init_weights(net, init_type='normal', gain=0.02):
     print('initialize network with %s' % init_type)
     net.apply(init_func)
 
-
 def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     if len(gpu_ids) > 0:
         assert(torch.cuda.is_available())
@@ -70,7 +69,7 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     return net
 
 
-
+@util.args_displayer
 def define_G(input_nc, output_nc, ngf, which_model_netG, opt, mask_global, norm='batch', use_dropout=False, init_type='normal', gpu_ids=[], init_gain=0.02):
     netG = None
     norm_layer = get_norm_layer(norm_type=norm)
@@ -119,7 +118,7 @@ def define_G(input_nc, output_nc, ngf, which_model_netG, opt, mask_global, norm=
 
     return init_net(netG, init_type, init_gain, gpu_ids), innerCos_list, shift_list
 
-
+@util.args_displayer
 def define_D(input_nc, ndf, which_model_netD,
              n_layers_D=3, norm='batch', use_sigmoid=False, init_type='normal', gpu_ids=[], init_gain=0.02):
     netD = None

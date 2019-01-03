@@ -11,6 +11,15 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 from skimage.transform import resize
+import argparse
+
+def args_displayer(func):
+    def _filter_namespace(args):
+        return [k for k in args if not isinstance(k, type(argparse.Namespace()))]
+    def wrapper(*args, **kwargs):
+        print(func.__name__, _filter_namespace(args), _filter_namespace(kwargs))
+        return func(*args, **kwargs)
+    return wrapper
 
 def create_masks(opt, N=10):
     masks = []
@@ -90,7 +99,7 @@ def tensor2im(input_image, imtype=np.uint8):
     if image_numpy.shape[0] == 1:
         image_numpy = np.tile(image_numpy, (3, 1, 1))
     image_numpy = (np.transpose(image_numpy, (1, 2, 0)) + 1) / 2.0 * 255.0
-    return image_numpy.astype(imtype)
+    return image_numpy.astype(imtype)[:, :, :3] # Remove alpha dimension
 
 # Remove dummy dim from a tensor.
 # Useful when input is 4 dims.

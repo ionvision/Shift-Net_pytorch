@@ -16,14 +16,16 @@ model_urls = {
 }
 
 
-def densenet121(pretrained=False, **kwargs):
+def densenet121(input_nc=None, pretrained=False, **kwargs):
     r"""Densenet-121 model from
     `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
 
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
-    model = DenseNet(num_init_features=64, growth_rate=32, block_config=(6, 12, 24, 16),
+    print('densenet121', input_nc)
+
+    model = DenseNet(input_nc=input_nc, num_init_features=64, growth_rate=32, block_config=(6, 12, 24, 16),
                      **kwargs)
     if pretrained:
         # '.'s are no longer allowed in module names, but pervious _DenseLayer
@@ -67,7 +69,7 @@ def densenet169(pretrained=False, **kwargs):
                 new_key = res.group(1) + res.group(2)
                 state_dict[new_key] = state_dict[key]
                 del state_dict[key]
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
     return model
 
 
@@ -95,7 +97,7 @@ def densenet201(pretrained=False, **kwargs):
                 new_key = res.group(1) + res.group(2)
                 state_dict[new_key] = state_dict[key]
                 del state_dict[key]
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
     return model
 
 
@@ -123,7 +125,7 @@ def densenet161(pretrained=False, **kwargs):
                 new_key = res.group(1) + res.group(2)
                 state_dict[new_key] = state_dict[key]
                 del state_dict[key]
-        model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict, strict=False)
     return model
 
 
@@ -179,14 +181,14 @@ class DenseNet(nn.Module):
         drop_rate (float) - dropout rate after each dense layer
         num_classes (int) - number of classification classes
     """
-    def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
+    def __init__(self, input_nc=3, growth_rate=32, block_config=(6, 12, 24, 16),
                  num_init_features=64, bn_size=4, drop_rate=0, num_classes=1000):
 
         super(DenseNet, self).__init__()
 
         # First convolution
         self.features = nn.Sequential(OrderedDict([
-            ('conv0', nn.Conv2d(3, num_init_features, kernel_size=7, stride=2, padding=3, bias=False)),
+            ('conv0', nn.Conv2d(input_nc, num_init_features, kernel_size=7, stride=2, padding=3, bias=False)),
             ('norm0', nn.BatchNorm2d(num_init_features)),
             ('relu0', nn.ReLU()),
             ('pool0', nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),

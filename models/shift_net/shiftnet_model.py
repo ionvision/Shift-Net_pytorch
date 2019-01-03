@@ -94,7 +94,7 @@ class ShiftNetModel(BaseModel):
         # load/define networks
         # self.ng_innerCos_list is the constraint list in netG inner layers.
         # self.ng_mask_list is the mask list constructing shift operation.
-        if opt.add_mask2input:
+        if opt.add_mask2input_gen:
             input_nc = opt.input_nc + 1
         else:
             input_nc = opt.input_nc
@@ -106,10 +106,13 @@ class ShiftNetModel(BaseModel):
             if opt.gan_type == 'vanilla':
                 use_sigmoid = True  # only vanilla GAN using BCECriterion
             # don't use cGAN
-            self.netD = networks.define_D(opt.input_nc, opt.ndf,
+            if opt.add_mask2input_dis:
+                input_nc = opt.input_nc + 1
+            else:
+                input_nc = opt.input_nc
+            self.netD = networks.define_D(input_nc, opt.ndf,
                                           opt.which_model_netD,
                                           opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type, self.gpu_ids, opt.init_gain)
-
         if self.isTrain:
             self.old_lr = opt.lr
             # define loss functions
@@ -166,7 +169,7 @@ class ShiftNetModel(BaseModel):
         real_A.narrow(1,1,1).masked_fill_(self.mask_global, 0.)#2*104.0/255.0 - 1.0
         real_A.narrow(1,2,1).masked_fill_(self.mask_global, 0.)#2*117.0/255.0 - 1.0
 
-        if self.opt.add_mask2input:
+        if self.opt.add_mask2input_gen:
             # make it 4 dimensions.
             # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
             real_A = torch.cat((real_A, (1 - self.mask_global).expand(real_A.size(0), 1, real_A.size(2), real_A.size(3)).type_as(real_A)), dim=1)
@@ -188,7 +191,7 @@ class ShiftNetModel(BaseModel):
         real_A.narrow(1,1,1).masked_fill_(mask, 0.)#2*104.0/255.0 - 1.0
         real_A.narrow(1,2,1).masked_fill_(mask, 0.)#2*117.0/255.0 - 1.0
 
-        if self.opt.add_mask2input:
+        if self.opt.add_mask2input_gen:
             # make it 4 dimensions.
             # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
             real_A = torch.cat((real_A, (1 - self.mask_global).expand(real_A.size(0), 1, real_A.size(2), real_A.size(3)).type_as(real_A)), dim=1)
@@ -203,7 +206,7 @@ class ShiftNetModel(BaseModel):
 
     def set_gt_latent(self):
         if not self.opt.skip:
-            if self.opt.add_mask2input:
+            if self.opt.add_mask2input_gen:
                 # make it 4 dimensions.
                 # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
                 real_B = torch.cat([self.real_B, (1 - self.mask_global).expand(self.real_B.size(0), 1, self.real_B.size(2), self.real_B.size(3)).type_as(self.real_B)], dim=1)
@@ -230,6 +233,19 @@ class ShiftNetModel(BaseModel):
 
     def get_image_paths(self):
         return self.image_paths
+
+    def _add_mask(self):
+        if self.opt.add_mask2input_dis:
+
+            #print('ADDING DIMENSION')
+            # make it 4 dimensions.
+            # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
+            self.fake_B = torch.cat((self.fake_B, (1 - self.mask_global).expand(self.fake_B.size(0), 1, self.fake_B.size(2), self.fake_B.size(3)).type_as(self.fake_B)), dim=1)
+            self.real_B = torch.cat((self.real_B, (1 - self.mask_global).expand(self.real_B.size(0), 1, self.real_B.size(2),
+                                                                            self.real_B.size(3)).type_as(self.real_B)), dim=1)
+
+            #print('self.fake_B', self.fake_B.shape)
+            #print('self.real_B', self.real_B.shape)
 
     def backward_D(self):
         fake_AB = self.fake_B
@@ -277,14 +293,15 @@ class ShiftNetModel(BaseModel):
             self.loss_D.backward()
 
     def _apply_sobel(self, input):
-        Gx = self.Gx(input)
-        Gy = self.Gy(input)
+        Gx = self.Gx(input[:, :3])
+        Gy = self.Gy(input[:, :3])
         G = torch.sqrt(torch.pow(Gx, 2) + torch.pow(Gy, 2))
         return G
 
     def backward_G(self):
         # First, G(A) should fake the discriminator
         fake_AB = self.fake_B
+
         pred_fake = self.netD(fake_AB)
 
         if self.wgan_gp:
@@ -336,6 +353,9 @@ class ShiftNetModel(BaseModel):
 
     def optimize_parameters(self):
         self.forward()
+
+        # Add MASK for discriminator
+        self._add_mask()
         # for other type of GAN, ncritic = 1.
         if not self.wgan_gp:
             self.ncritic = 1
