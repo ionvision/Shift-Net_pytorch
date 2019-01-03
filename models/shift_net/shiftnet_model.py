@@ -236,16 +236,13 @@ class ShiftNetModel(BaseModel):
 
     def _add_mask(self):
         if self.opt.add_mask2input_dis:
-
-            #print('ADDING DIMENSION')
             # make it 4 dimensions.
             # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
             self.fake_B = torch.cat((self.fake_B, (1 - self.mask_global).expand(self.fake_B.size(0), 1, self.fake_B.size(2), self.fake_B.size(3)).type_as(self.fake_B)), dim=1)
             self.real_B = torch.cat((self.real_B, (1 - self.mask_global).expand(self.real_B.size(0), 1, self.real_B.size(2),
                                                                             self.real_B.size(3)).type_as(self.real_B)), dim=1)
 
-            #print('self.fake_B', self.fake_B.shape)
-            #print('self.real_B', self.real_B.shape)
+
 
     def backward_D(self):
         fake_AB = self.fake_B
@@ -296,7 +293,27 @@ class ShiftNetModel(BaseModel):
         Gx = self.Gx(input[:, :3])
         Gy = self.Gy(input[:, :3])
         G = torch.sqrt(torch.pow(Gx, 2) + torch.pow(Gy, 2))
-        return G
+        return G, Gx, Gy
+
+    def calculate_sobel_loss(self):
+        # SOBEL LOSS
+        # Sobel FAKE_B
+        self.loss_sobel = 0
+        norm_G_fake_B, Gx_fake_B, Gy_fake_B = self._apply_sobel(self.fake_B)
+
+        # Sobel REAL_B
+        norm_G_real_B, Gx_real_B, Gy_real_B = self._apply_sobel(self.real_B)
+        self.loss_sobel = 0
+
+        # NORM CRITERION
+        self.loss_sobel += self.criterionL1(norm_G_fake_B, norm_G_real_B) / (10 * self.opt.lambda_A ** 2)
+        self.loss_G_L1 += self.loss_sobel
+
+        # ANGLE CRITERION
+        fake_angle_B = torch.atan(Gy_fake_B / (Gx_fake_B + 10e-5))
+        real_angle_B = torch.atan(Gy_real_B / (Gx_real_B + 10e-5))
+
+        self.loss_sobel += self.criterionL1(fake_angle_B, real_angle_B) / (10 * self.opt.lambda_A ** 2)
 
     def backward_G(self):
         # First, G(A) should fake the discriminator
@@ -324,17 +341,7 @@ class ShiftNetModel(BaseModel):
         self.loss_G_L1 += self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_A
 
         if self.opt.sobel_norm_loss:
-            # SOBEL LOSS
-            # Sobel FAKE_B
-            self.loss_sobel = 0
-            G_fakeB = self._apply_sobel(self.fake_B)
-
-            # Sobel REAL_B
-            G_realB = self._apply_sobel(self.real_B)
-            self.loss_sobel = 0
-
-            self.loss_sobel += self.criterionL1(G_fakeB, G_realB) / (10 * self.opt.lambda_A ** 2)
-            self.loss_G_L1 += self.loss_sobel
+            self.calculate_sobel_loss()
 
         if self.wgan_gp:
             self.loss_G = self.loss_G_L1 - self.loss_G_GAN * self.opt.gan_weight
