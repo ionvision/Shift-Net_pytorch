@@ -1,5 +1,6 @@
 import torch
 from torch.nn import functional as F
+from torch import nn
 import util.util as util
 from models import networks
 from models.shift_net.base_model import BaseModel
@@ -29,6 +30,9 @@ class ShiftNetModel(BaseModel):
         self.isTrain = opt.isTrain
         # specify the training losses you want to print out. The program will call base_model.get_current_losses
         self.loss_names = ['G_GAN', 'G_L1', 'D']
+        if self.opt.sobel_norm_loss:
+            self.loss_names.append('sobel')
+
         # specify the images you want to save/display. The program will call base_model.get_current_visuals
         if self.opt.show_flow:
             self.visual_names = ['real_A', 'fake_B', 'real_B', 'flow_srcs']
@@ -56,6 +60,19 @@ class ShiftNetModel(BaseModel):
         if opt.mask_type == 'center':
             assert opt.fixed_mask == 1, "Center mask must be fixed mask!"
 
+
+        if self.opt.sobel_norm_loss:
+            # SOBEL CRITERION
+            self.Gx = nn.Conv2d(opt.output_nc, 1, kernel_size=(3, 3), padding=1, bias=False)
+            self.Gy = nn.Conv2d(opt.output_nc, 1, kernel_size=(3, 3), padding=1, bias=False)
+
+            self.Gx.weight.data[0] = torch.Tensor([[1, 0, -1],
+                                                  [2, 0, -2],
+                                                  [1, 0, -1]])
+            self.Gy.weight.data[0] = torch.Tensor([[1, 2, 1],
+                                                  [0, 0, 0],
+                                                  [-1, -2, -1]])
+
         if self.mask_type == 'random':
             self.create_random_mask()
 
@@ -70,6 +87,9 @@ class ShiftNetModel(BaseModel):
         if len(opt.gpu_ids) > 0:
             self.use_gpu = True
             self.mask_global = self.mask_global.to(self.device)
+            if self.opt.sobel_norm_loss:
+                self.Gx = self.Gx.to(self.device)
+                self.Gy = self.Gy.to(self.device)
 
         # load/define networks
         # self.ng_innerCos_list is the constraint list in netG inner layers.
@@ -168,6 +188,11 @@ class ShiftNetModel(BaseModel):
         real_A.narrow(1,1,1).masked_fill_(mask, 0.)#2*104.0/255.0 - 1.0
         real_A.narrow(1,2,1).masked_fill_(mask, 0.)#2*117.0/255.0 - 1.0
 
+        if self.opt.add_mask2input:
+            # make it 4 dimensions.
+            # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
+            real_A = torch.cat((real_A, (1 - self.mask_global).expand(real_A.size(0), 1, real_A.size(2), real_A.size(3)).type_as(real_A)), dim=1)
+
         self.real_A = real_A
         self.real_B = real_B
         self.image_paths = input['A_paths']       
@@ -251,6 +276,11 @@ class ShiftNetModel(BaseModel):
         else:
             self.loss_D.backward()
 
+    def _apply_sobel(self, input):
+        Gx = self.Gx(input)
+        Gy = self.Gy(input)
+        G = torch.sqrt(torch.pow(Gx, 2) + torch.pow(Gy, 2))
+        return G
 
     def backward_G(self):
         # First, G(A) should fake the discriminator
@@ -275,6 +305,19 @@ class ShiftNetModel(BaseModel):
 
         self.loss_G_L1 = 0
         self.loss_G_L1 += self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_A
+
+        if self.opt.sobel_norm_loss:
+            # SOBEL LOSS
+            # Sobel FAKE_B
+            self.loss_sobel = 0
+            G_fakeB = self._apply_sobel(self.fake_B)
+
+            # Sobel REAL_B
+            G_realB = self._apply_sobel(self.real_B)
+            self.loss_sobel = 0
+
+            self.loss_sobel += self.criterionL1(G_fakeB, G_realB) / (10 * self.opt.lambda_A ** 2)
+            self.loss_G_L1 += self.loss_sobel
 
         if self.wgan_gp:
             self.loss_G = self.loss_G_L1 - self.loss_G_GAN * self.opt.gan_weight
