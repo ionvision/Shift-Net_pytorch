@@ -41,3 +41,37 @@ class GANLoss(nn.Module):
         target_tensor = self.get_target_tensor(input, target_is_real)
         return self.loss(input, target_tensor)
 
+
+def to_categorical(input, target_is_real, mask):
+    target = torch.zeros_like(input)
+    if target_is_real:
+        target[:, 0] = 1
+    else:
+        target[:, 1, torch.squeeze(mask) == 1] = 1
+        target[:, 2, torch.squeeze(mask) == 0] = 1
+    return target
+
+
+# Defines the GAN loss which uses either LSGAN or the regular GAN.
+# When LSGAN is used, it is basically same as MSELoss,
+# but it abstracts away the need to create the target label tensor
+# that has the same size as the input
+class GANLossMultiLabel(nn.Module):
+    def __init__(self, target_real_label=1.0, target_fake_label=0.0):
+        super(GANLoss, self).__init__()
+        self.register_buffer('real_label', torch.tensor(target_real_label))
+        self.register_buffer('fake_label', torch.tensor(target_fake_label))
+
+        self.loss = nn.CrossEntropyLoss()
+
+    def get_target_tensor(self, input, target_is_real):
+        if target_is_real:
+            target_tensor = self.real_label
+        else:
+            target_tensor = self.fake_label
+        return target_tensor.expand_as(input)
+
+    def __call__(self, input, target_is_real, mask):
+        target_tensor = self.get_target_tensor(input, target_is_real)
+        return self.loss(input, target_tensor)
+

@@ -81,6 +81,8 @@ class BaseOptions():
                             help='Enforce sobel norm loss over reconstruction')
         parser.add_argument('--residual_soft_attention', type=int, default=0,
                             help='Not implemented yet')
+        parser.add_argument('--multi_label', type=int, default=0,
+                            help='Not implemented yet')
 
         self.initialized = True
         return parser

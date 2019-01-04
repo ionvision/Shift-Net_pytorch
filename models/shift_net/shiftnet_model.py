@@ -74,7 +74,7 @@ class ShiftNetModel(BaseModel):
                                                   [-1, -2, -1]])
 
         if self.mask_type == 'random':
-            self.create_random_mask()
+            self.mask_global = self.create_random_mask()
 
         self.wgan_gp = False
         # added for wgan-gp
@@ -161,13 +161,13 @@ class ShiftNetModel(BaseModel):
         else:
             self.mask_global = self.create_random_mask().type_as(self.mask_global)
 
+        if self.use_gpu:
+            self.mask_global = self.mask_global.float()
+
         self.set_latent_mask(self.mask_global, 3)
 
-        #print(torch.max(real_A), torch.min(real_A))
-
-        real_A.narrow(1,0,1).masked_fill_(self.mask_global, 0.)#2*123.0/255.0 - 1.0
-        real_A.narrow(1,1,1).masked_fill_(self.mask_global, 0.)#2*104.0/255.0 - 1.0
-        real_A.narrow(1,2,1).masked_fill_(self.mask_global, 0.)#2*117.0/255.0 - 1.0
+        for i in range(real_A.size(1)):
+            real_A.narrow(1,i,1).masked_fill_(self.mask_global, 0.)#2*123.0/255.0 - 1.0
 
         if self.opt.add_mask2input_gen:
             # make it 4 dimensions.
@@ -178,6 +178,9 @@ class ShiftNetModel(BaseModel):
         self.real_B = real_B
         self.image_paths = input['A_paths']
 
+        #SET LATENT
+        self.set_gt_latent()
+
     # TODO: it has not been implemented totally.
     def set_input_with_mask(self, input, mask):
         real_A = input['A'].to(self.device)
@@ -187,9 +190,8 @@ class ShiftNetModel(BaseModel):
 
         self.set_latent_mask(mask, 3)
 
-        real_A.narrow(1,0,1).masked_fill_(mask, 0.)#2*123.0/255.0 - 1.0
-        real_A.narrow(1,1,1).masked_fill_(mask, 0.)#2*104.0/255.0 - 1.0
-        real_A.narrow(1,2,1).masked_fill_(mask, 0.)#2*117.0/255.0 - 1.0
+        for i in range(real_A.size(1)):
+            real_A.narrow(1,i,1).masked_fill_(self.mask_global, 0.)#2*123.0/255.0 - 1.0
 
         if self.opt.add_mask2input_gen:
             # make it 4 dimensions.
@@ -241,8 +243,6 @@ class ShiftNetModel(BaseModel):
             self.fake_B = torch.cat((self.fake_B, (1 - self.mask_global).expand(self.fake_B.size(0), 1, self.fake_B.size(2), self.fake_B.size(3)).type_as(self.fake_B)), dim=1)
             self.real_B = torch.cat((self.real_B, (1 - self.mask_global).expand(self.real_B.size(0), 1, self.real_B.size(2),
                                                                             self.real_B.size(3)).type_as(self.real_B)), dim=1)
-
-
 
     def backward_D(self):
         fake_AB = self.fake_B
@@ -321,6 +321,7 @@ class ShiftNetModel(BaseModel):
 
         pred_fake = self.netD(fake_AB)
 
+
         if self.wgan_gp:
             self.loss_G_GAN = torch.mean(pred_fake)
         else:
@@ -338,7 +339,7 @@ class ShiftNetModel(BaseModel):
 
 
         self.loss_G_L1 = 0
-        self.loss_G_L1 += self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_A
+        self.loss_G_L1 += self.criterionL1(self.fake_B.float(), self.real_B.float()) * self.opt.lambda_A
 
         if self.opt.sobel_norm_loss:
             self.calculate_sobel_loss()
