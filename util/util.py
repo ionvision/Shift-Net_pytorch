@@ -219,10 +219,23 @@ def cal_feat_mask(inMask, nlayers):
     inMask = inMask.float()
     ntimes = 2**nlayers
     inMask = F.interpolate(inMask, (inMask.size(2)//ntimes, inMask.size(3)//ntimes), mode='bilinear')
-    inMask = (inMask > 0.5).float()
+    inMask = (inMask > 1/float(ntimes)).float() #TODO VERIFY THAT. SHOULD BE CORRECT, SHOULD DO 1/8. HERE
     inMask = inMask.detach().byte()
 
     return inMask
+
+def resize_mask(inMask, h, w):
+    assert inMask.dim() == 4, "mask must be 4 dimensions"
+    assert inMask.size(0) == 1, "the first dimension must be 1 for mask"
+    inMask = inMask.float()
+    #H, W = inMask.size(-2), inMask.size(-1)
+    inMask = F.interpolate(inMask, (h,w), mode='bilinear')
+    print(torch.sum(inMask))
+    inMask = (inMask > .5) #TODO VERIFY THAT. SHOULD BE CORRECT
+    print(torch.sum(inMask))
+    inMask = inMask.detach().byte()
+
+    return torch.squeeze(inMask)
 
 def cal_flag_given_mask_thred(img, mask, patch_size, stride, mask_thred):
     assert img.dim() == 3, 'img has to be 3 dimenison!'

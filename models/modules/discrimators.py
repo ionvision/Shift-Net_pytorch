@@ -1,11 +1,12 @@
 import functools
+from torch.nn import functional as F
 from .denset_net import *
 
 from .modules import *
 ################################### This is for D ###################################
 # Defines the PatchGAN discriminator with the specified arguments.
 class NLayerDiscriminator(nn.Module):
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False):
+    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False, multi_label=True):
         super(NLayerDiscriminator, self).__init__()
         if type(norm_layer) == functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
@@ -40,10 +41,14 @@ class NLayerDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, True)
         ]
 
-        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]
-
-        if use_sigmoid:
-            sequence += [nn.Sigmoid()]
+        if not multi_label:
+            sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]
+            if use_sigmoid:
+                sequence += [nn.Sigmoid()]
+        else:
+            sequence += [nn.Conv2d(ndf * nf_mult, 3, kernel_size=kw, stride=1, padding=padw)]
+            if use_sigmoid:
+                sequence += [nn.Softmax(dim=1)]
 
         self.model = nn.Sequential(*sequence)
 

@@ -1,3 +1,5 @@
+from functools import partial
+
 import torch
 from torch.nn import functional as F
 from torch import nn
@@ -116,7 +118,7 @@ class ShiftNetModel(BaseModel):
         if self.isTrain:
             self.old_lr = opt.lr
             # define loss functions
-            self.criterionGAN = networks.GANLoss(gan_type=opt.gan_type).to(self.device)
+            self.criterionGAN = networks.GANLoss(gan_type=opt.gan_type).to(self.device) if not opt.multi_label else networks.GANLossMultiLabel().to(self.device)
             self.criterionL1 = torch.nn.L1Loss()
 
             # initialize optimizers
@@ -161,13 +163,10 @@ class ShiftNetModel(BaseModel):
         else:
             self.mask_global = self.create_random_mask().type_as(self.mask_global)
 
-        if self.use_gpu:
-            self.mask_global = self.mask_global.float()
-
         self.set_latent_mask(self.mask_global, 3)
 
         for i in range(real_A.size(1)):
-            real_A.narrow(1,i,1).masked_fill_(self.mask_global.byte(), 0.)#2*123.0/255.0 - 1.0
+            real_A.narrow(1,i,1).masked_fill_(self.mask_global, 0.)#2*123.0/255.0 - 1.0
 
         if self.opt.add_mask2input_gen:
             # make it 4 dimensions.
@@ -271,9 +270,15 @@ class ShiftNetModel(BaseModel):
         else:
             self.pred_fake = self.netD(fake_AB.detach())
 
+            #print(self.pred_fake[0, :, 0, 0])
+
             if self.opt.gan_type in ['vanilla', 'lsgan']:
-                self.loss_D_fake = self.criterionGAN(self.pred_fake, False)
-                self.loss_D_real = self.criterionGAN (self.pred_real, True)
+                if not self.opt.multi_label:
+                    self.loss_D_fake = self.criterionGAN(self.pred_fake, False)
+                    self.loss_D_real = self.criterionGAN (self.pred_real, True)
+                else:
+                    self.loss_D_fake = self.criterionGAN(self.pred_fake, False, self.mask_global)
+                    self.loss_D_real = self.criterionGAN (self.pred_real, True, self.mask_global)
 
                 self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
 
@@ -326,7 +331,10 @@ class ShiftNetModel(BaseModel):
             self.loss_G_GAN = torch.mean(pred_fake)
         else:
             if self.opt.gan_type in ['vanilla', 'lsgan']:
-                self.loss_G_GAN = self.criterionGAN(pred_fake, True)
+                if not self.opt.multi_label:
+                    self.loss_G_GAN = self.criterionGAN(pred_fake, True)
+                else:
+                    self.loss_G_GAN = self.criterionGAN(pred_fake, True, self.mask_global)
 
             elif self.opt.gan_type == 're_s_gan':
                 pred_real = self.netD (self.real_B)
@@ -365,6 +373,7 @@ class ShiftNetModel(BaseModel):
         # Add MASK for discriminator
         self._add_mask()
         # for other type of GAN, ncritic = 1.
+
         if not self.wgan_gp:
             self.ncritic = 1
         for i in range(self.ncritic):

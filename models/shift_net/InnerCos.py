@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import util.util as util
 import types
+
 class InnerCos(nn.Module):
     def __init__(self, crit='MSE', strength=1, skip=0):
         super(InnerCos, self).__init__()

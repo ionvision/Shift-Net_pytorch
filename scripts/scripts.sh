@@ -1,0 +1,1 @@
+python train.py --dataroot /mnt/hdd2/AIM/paris_train_original --checkpoints_dir /mnt/hdd2/AIM/checkpoints/ --name 7_01_2019_paris_1 --batchSize 4 --dataset_mode aligned_resized --fixed_mask 1 --mask_type center --sobel_norm_loss 1 --only_lastest 1 --gpu_ids 0 --model bilinear_shiftnet --which_model_netG bilinear_unet_shift_triple --multi_label 1 --display_id 0
