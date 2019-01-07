@@ -37,7 +37,6 @@ class AlignedDatasetResized(BaseDataset):
         #    A = A.index_select(2, idx)
 
         # let B directly equals A
-        print(A.shape)
         B = A.clone()
         return {'A': A, 'B': B,
                 'A_paths': A_path}

@@ -167,7 +167,7 @@ class ShiftNetModel(BaseModel):
         self.set_latent_mask(self.mask_global, 3)
 
         for i in range(real_A.size(1)):
-            real_A.narrow(1,i,1).masked_fill_(self.mask_global, 0.)#2*123.0/255.0 - 1.0
+            real_A.narrow(1,i,1).masked_fill_(self.mask_global.byte(), 0.)#2*123.0/255.0 - 1.0
 
         if self.opt.add_mask2input_gen:
             # make it 4 dimensions.
