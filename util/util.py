@@ -228,13 +228,9 @@ def resize_mask(inMask, h, w):
     assert inMask.dim() == 4, "mask must be 4 dimensions"
     assert inMask.size(0) == 1, "the first dimension must be 1 for mask"
     inMask = inMask.float()
-    #H, W = inMask.size(-2), inMask.size(-1)
     inMask = F.interpolate(inMask, (h,w), mode='bilinear')
-    print(torch.sum(inMask))
     inMask = (inMask > .5) #TODO VERIFY THAT. SHOULD BE CORRECT
-    print(torch.sum(inMask))
     inMask = inMask.detach().byte()
-
     return torch.squeeze(inMask)
 
 def cal_flag_given_mask_thred(img, mask, patch_size, stride, mask_thred):
