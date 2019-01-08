@@ -73,14 +73,19 @@ class BaseOptions():
 
         parser.add_argument('--only_lastest', type=int, default=0,
                             help='If True, it will save only the lastest weights and the one minimizing the L1 loss')
+
         parser.add_argument('--add_mask2input_gen', type=int, default=1,
                             help='If True, It will add the mask as a fourth dimension over input space for the GENERATOR')
-        parser.add_argument('--add_mask2input_dis', type=int, default=1,
+
+        parser.add_argument('--add_mask2input_dis', type=int, default=0,
                             help='If True, It will add the mask as a fourth dimension over input space for the DISCRIMINATOR')
+
         parser.add_argument('--sobel_norm_loss', type=int, default=0,
                             help='Enforce sobel norm loss over reconstruction')
+
         parser.add_argument('--residual_soft_attention', type=int, default=0,
                             help='Not implemented yet')
+
         parser.add_argument('--multi_label', type=int, default=0,
                             help='Not implemented yet')
 

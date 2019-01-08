@@ -114,7 +114,7 @@ class ShiftNetModel(BaseModel):
                 input_nc = opt.input_nc
             self.netD = networks.define_D(input_nc, opt.ndf,
                                           opt.which_model_netD,
-                                          opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type, self.gpu_ids, opt.init_gain)
+                                          opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type, self.gpu_ids, opt.init_gain, opt=opt)
         if self.isTrain:
             self.old_lr = opt.lr
             # define loss functions
