@@ -25,6 +25,11 @@ def create_model(opt):
         assert (opt.dataset_mode == 'aligned' or opt.dataset_mode == 'aligned_resized')
         from models.res_patch_soft_shift.res_patch_soft_shiftnet_model import ResPatchSoftShiftNetModel
         model = ResPatchSoftShiftNetModel()
+        
+    elif opt.model == 'bilinear_shiftnet':
+        assert (opt.dataset_mode == 'aligned' or opt.dataset_mode == 'aligned_resized')
+        from models.bilinear_shift_net.shiftnet_model import BilinearShiftNet
+        model = BilinearShiftNet()
 
     elif opt.model == 'test':
         assert(opt.dataset_mode == 'single')

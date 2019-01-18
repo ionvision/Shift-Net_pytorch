@@ -445,3 +445,61 @@ def make_color_wheel():
     colorwheel[col:col+MR, 2] = 255 - np.transpose(np.floor(255 * np.arange(0, MR) / MR))
     colorwheel[col:col+MR, 0] = 255
     return colorwheel
+
+# U: 1024*1024
+# V: 1024*1024
+# return: U: 196*196
+#         V: 828*196
+def filter_M(U, V, flag):
+    # 1*196
+    mask_indexes = (flag == 1).nonzero().t()
+    # 828*1
+    non_mask_indexes = (flag == 0).nonzero()
+    U = U[mask_indexes.t(), mask_indexes]
+    V = V[non_mask_indexes, mask_indexes]
+    return U, V
+
+def _filter(input_windows, flag, value):
+    ## EXTRACT MASK OR NOT DEPENDING ON VALUE
+    input_window = input_windows[flag == value]
+    return input_window.view(input_window.size(0), -1)
+
+def bilinear_attention_map(x, y, U, V, v1, P):
+    tmp = torch.einsum('i,j->ij', [v1, P])
+    XT_U = torch.einsum('ki,kj->ij', [x, U])
+    tmp1 = torch.einsum('ij,ij->ij', [tmp, XT_U])
+    VT_y = torch.einsum('ki,kj->ij', [V, y])
+    tmp = torch.einsum('ik,kj->ij', [tmp1, VT_y])
+    A = F.softmax(tmp, dim=1)
+    return A, XT_U, VT_y
+
+def unfold(img, patch_size, stride, with_idx=False):
+    n_dim = 3
+    assert img.dim() == n_dim, 'image must be of dimension 3.'
+
+    kH, kW = patch_size, patch_size
+    dH, dW = stride, stride
+    input_windows = img.unfold(1, kH, dH).unfold(2, kW, dW)
+
+    i_1, i_2, i_3, i_4, i_5 = input_windows.size(0), input_windows.size(1), input_windows.size(
+        2), input_windows.size(3), input_windows.size(4)
+
+    input_windows = input_windows.permute(1, 2, 0, 3, 4).contiguous().view(i_2 * i_3, i_1, i_4, i_5)
+
+    if with_idx:
+        return input_windows, i_1, i_2, i_3, i_4
+    return input_windows
+
+def format_data(x, y, flag, patch_size, stride):
+    x_unfolded = unfold(torch.squeeze(x), patch_size, stride)
+    y_unfolded, i_1, i_2, i_3, i_4 = unfold(torch.squeeze(y), patch_size, stride, with_idx=True)
+    X = _filter(x_unfolded, flag, 1)
+    Y = _filter(y_unfolded, flag, 0)
+
+    K = X.size(0)
+
+    P = torch.ones((K)).type_as(x)
+    return X, Y, P, flag, i_1, i_2, i_3, i_4
+
+def bilinear_attention(XT_U, A, VT_y, v1):
+    return torch.einsum('ki,kk,jk,a->ia', [XT_U, A, VT_y, v1])
