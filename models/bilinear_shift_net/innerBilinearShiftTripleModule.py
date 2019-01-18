@@ -82,7 +82,7 @@ class InnerBilinearShiftTripleModule(nn.Module):
             shift_holder = shift_holder.view(shift_masked_dim1, -1)
             shift_holder[:, mask_indexes] = attention_tensor.t().unsqueeze(-1)
 
-            shift_masked_all[idx] = shift_holder.view(former_all.shape)
+            shift_masked_all[idx] = shift_holder.view(former.shape)
 
         return torch.cat((former_all, latter_all, shift_masked_all), 1)
 
