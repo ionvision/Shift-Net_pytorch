@@ -1,3 +1,13 @@
+# Branch Overview
+I tried different types of `self.U`, `self.V` and `self.v`, including `xavier_uniform`,`uniform`,`normal`,`orthogonal`.
+Among these: `uniform` is quite bad, with semantic structures.
+             `orthogonal` is blurry and inferior structures.
+             `normal` is bad, with artifacts, similar with seal strokes.
+             `xavier_uniform`： is very bad, blurry and with 'green dots' artifacts.(If training epochs are larger than 30 for Paris)
+
+Therefore, from these initial experiments on BAN, BAN will not as the substitution of soft shift.
+However, I will keep this branch as it is indeed intresting.
+
 # Architecutre
 <img src="architecture.png" width="1000"/> 
 
