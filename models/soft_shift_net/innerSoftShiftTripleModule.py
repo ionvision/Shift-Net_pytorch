@@ -3,9 +3,24 @@ from torch.nn import functional as F
 import torch.nn as nn
 import torch
 import util.util as util
+from torch.nn import Parameter
 
 
 class InnerSoftShiftTripleModule(nn.Module):
+    
+    def __init__(self, dim, feat_dim):
+        super(InnerSoftShiftTripleModule, self).__init__()
+
+        self.dim = dim
+        self.feat_dim = feat_dim
+
+        self.Tensor = torch.cuda.FloatTensor if torch.cuda.is_available else torch.FloatTensor
+        self.kernel = Parameter(self.Tensor(self.feat_dim, self.feat_dim))
+        self.bias = Parameter(self.Tensor(self.dim * self.dim, self.feat_dim))
+
+        nn.init.xavier_uniform_(self.kernel)
+        nn.init.xavier_uniform_(self.bias)
+
     def forward(self, input, mask, stride, triple_w, flag, show_flow):
         assert input.dim() == 4, "Input Dim has to be 4"
         self.triple_w = triple_w
@@ -38,7 +53,7 @@ class InnerSoftShiftTripleModule(nn.Module):
             former = former_all.narrow(0, idx, 1) ### decoder feature
 
             #GET COSINE, RESHAPED LATTER AND ITS INDEXES
-            cosine, latter_windows, former_windows, i_2, i_3, i_1, i_4 = Nonparm.cosine_similarity(former.clone().squeeze(), latter.clone().squeeze(), 1, stride, flag, with_former=True)
+            cosine, latter_windows, former_windows, i_2, i_3, i_1, i_4 = Nonparm.co_attention(former.clone().squeeze(), latter.clone().squeeze(), 1, stride, flag, self.kernel, self.bias, with_former=True)
 
             ## GET INDEXES THAT MAXIMIZE COSINE SIMILARITY
             cosine_softmax = F.softmax(cosine, dim=1)

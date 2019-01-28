@@ -5,9 +5,10 @@ from .innerSoftShiftTripleModule import InnerSoftShiftTripleModule
 
 
 class InnerSoftShiftTriple(nn.Module):
-    def __init__(self, shift_sz=1, stride=1, mask_thred=1, triple_weight=1, layer_to_last=3):
+    def __init__(self, opt, shift_sz=1, stride=1, mask_thred=1, triple_weight=1, layer_to_last=3):
         super(InnerSoftShiftTriple, self).__init__()
 
+        self.opt = opt
         self.shift_sz = shift_sz
         self.stride = stride
         self.mask_thred = mask_thred
@@ -15,7 +16,10 @@ class InnerSoftShiftTriple(nn.Module):
         self.show_flow = False # default false. Do not change it to be true, it is computation-heavy.
         self.flow_srcs = None # Indicating the flow src(pixles in non-masked region that will shift into the masked region)
         self.layer_to_last = layer_to_last
-        self.softShift = InnerSoftShiftTripleModule()
+        
+        dim = self.opt.fineSize // (2 ** layer_to_last)
+        feat_dim = self.opt.ngf * 4
+        self.softShift = InnerSoftShiftTripleModule(dim, feat_dim)
 
     def set_mask(self, mask_global):
         mask = util.cal_feat_mask(mask_global, self.layer_to_last)

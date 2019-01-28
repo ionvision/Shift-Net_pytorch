@@ -306,7 +306,7 @@ class SoftUnetSkipConnectionBlock(nn.Module):
 
         # As the downconv layer is outer_nc in and inner_nc out.
         # So the shift define like this:
-        shift = InnerSoftShiftTriple(opt.shift_sz, opt.stride, opt.mask_thred, opt.triple_weight, layer_to_last=layer_to_last)
+        shift = InnerSoftShiftTriple(opt, opt.shift_sz, opt.stride, opt.mask_thred, opt.triple_weight, layer_to_last=layer_to_last)
 
         shift.set_mask(mask_global)
         shift_list.append(shift)
