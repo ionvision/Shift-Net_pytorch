@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
             model.optimize_parameters()
 
-            if total_steps % opt.display_freq == 0:
+            if total_steps % (opt.batchSize * opt.display_freq) == 0:
                 save_result = total_steps % opt.update_html_freq == 0
                 if opt.show_flow:
                     model.set_flow_src()

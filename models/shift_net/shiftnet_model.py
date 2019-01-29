@@ -114,10 +114,59 @@ class ShiftNetModel(BaseModel):
             for optimizer in self.optimizers:
                 self.schedulers.append(networks.get_scheduler(optimizer, opt))
 
-        if not self.isTrain or opt.continue_train:
-            self.load_networks(opt.which_epoch)
+        #if not self.isTrain or opt.continue_train:
+        self.load_networks('latest')
 
         self.print_networks(opt.verbose)
+        
+    def _mix_pixel(self, img, mask):
+    
+        b, c, h, w = img.shape
+        h = mask.size(-1)
+        folded_mask = mask.view(-1)
+        
+        mask_indexes = (folded_mask == 1).nonzero()
+        L = mask_indexes.nelement()
+        
+        idx = torch.randperm(L)
+        mask_indexes = mask_indexes[idx]
+
+        non_mask_indexes = (folded_mask == 0).nonzero()
+        
+        idx = torch.randperm(non_mask_indexes.nelement())
+        non_mask_indexes = non_mask_indexes[idx][:L]
+                
+        img = img.view((b, c, h * w)).permute((2, 0, 1))
+
+        img[mask_indexes] = img[non_mask_indexes]
+
+        img = img.permute((1, 2, 0)).view((b, c, h, w))
+        
+        return img
+
+    def _distance_sampling(self, img, mask):
+    
+        b, c, h, w = img.shape
+        h = mask.size(-1)
+        folded_mask = mask.view(-1)
+    
+        mask_indexes = (folded_mask == 1).nonzero()
+        L = mask_indexes.nelement()
+    
+        idx = torch.randperm(L)
+    
+        non_mask_indexes = (folded_mask == 0).nonzero()
+    
+        idx = torch.randperm(non_mask_indexes.nelement())
+        non_mask_indexes = non_mask_indexes[idx][:L]
+    
+        img = img.view((b, c, h * w)).permute((2, 0, 1))
+    
+        img[mask_indexes] = img[non_mask_indexes]
+    
+        img = img.permute((1, 2, 0)).view((b, c, h, w))
+    
+        return img
 
     def set_input(self, input):
         real_A = input['A'].to(self.device)

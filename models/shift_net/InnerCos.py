@@ -30,6 +30,8 @@ class InnerCos(nn.Module):
         self.bs, self.c, _, _ = in_data.size()
         if torch.cuda.is_available:
             self.mask = self.mask.cuda()
+        self.loss = 0
+        '''
         if not self.skip:
             self.former = in_data.narrow(1, 0, self.c//2)
             self.former_in_mask = torch.mul(self.former, self.mask)
@@ -41,6 +43,7 @@ class InnerCos(nn.Module):
             self.target = self.target * self.strength
         else:
             self.loss = 0
+        '''
         self.output = in_data
         return self.output
 

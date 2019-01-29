@@ -26,9 +26,8 @@ class Modified_NonparametricShift(object):
 		#print(former.shape, kernel.shape)
 		M = torch.einsum('ik,jk->ij', [latter, 1. + kernel])
 		M += bias[flag == 0]
-		#print(former.shape, M.shape)
 		M = torch.einsum("ik,jk->ij", [former, M])
-		M = torch.log(torch.abs(M)) #TODO DON'T SATURATE SOFTMAX
+		M = torch.sign(M) * torch.log(torch.abs(M)) #TODO DON'T SATURATE SOFTMAX
 		
 		if not with_former:
 			return M, latter_windows, i_2, i_3, i_1, i_4

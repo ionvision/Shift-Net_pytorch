@@ -115,7 +115,74 @@ def diagnose_network(net, name='network'):
     print(name)
     print(mean)
 
+def rand_pixel_mixing(img, mask):
+    '''
+    This function is going to randomly sample from the outside of the masl toward the inside.
+    '''
 
+    b, c, H, W = img.shape
+    folded_mask = mask.view(-1)
+
+    mask_indexes = (folded_mask == 1).nonzero()
+    L = mask_indexes.nelement()
+
+    idx = torch.randperm(L)
+    mask_indexes = mask_indexes[idx]
+
+    non_mask_indexes = (folded_mask == 0).nonzero()
+
+    idx = torch.randperm(non_mask_indexes.nelement())
+    non_mask_indexes = non_mask_indexes[idx][:L]
+
+    img = img.view((b, c, H * W)).permute((2, 0, 1))
+
+    img[mask_indexes] = img[non_mask_indexes]
+
+    img = img.permute((1, 2, 0)).view((b, c, H, W))
+
+    return img
+
+def distance_pixel_mixing(img, mask):
+    def _sample_distance(dist):
+        dist = dist.astype(np.float32)
+        out = []
+        n, m = dist.shape
+        r = list(range(m))
+        for i in range(n):
+            p = np.array(dist[i]).astype(np.float32)
+            out.append(np.random.choice(r, p=p))
+        return np.array(out).astype(np.float32)
+
+    b, c, H, W = img.shape
+    w = mask.size(-1)
+    folded_mask = mask.view(-1)
+    
+    x = (folded_mask == 1).nonzero()
+    
+    y = (folded_mask == 0).nonzero()
+
+    n = x.size(0)
+    m = y.size(0)
+    d = x.size(1)
+
+    X = x.unsqueeze(1).expand(n, m, d).float()
+    Y = y.unsqueeze(0).expand(n, m, d).float()
+    
+    d = -torch.pow(X - Y, 2).sum(2)
+    d /= - d.min() / 4
+
+    dist = torch.exp(d)
+    dist /= dist.sum(1, keepdim=True)
+    dist = dist.cpu().numpy()
+
+    selected_indexes = torch.from_numpy(_sample_distance(dist))
+
+    selected_indexes = selected_indexes.unsqueeze(-1).type_as(x)
+
+    img = img.view((b, c, H * W))
+    img = img.permute((2, 0, 1))
+    img[x] = img[selected_indexes]
+    return img.permute((1, 2, 0)).view((b, c, H, W))
 
 def wrapper_gmask(opt):
     # batchsize should be 1 for mask_global
