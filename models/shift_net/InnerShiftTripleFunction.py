@@ -4,7 +4,7 @@ import torch
 import util.util as util
 import time
 
-
+# For guide shift of random mask.
 class InnerShiftTripleFunction(torch.autograd.Function):
     ctx = None
 
@@ -38,12 +38,14 @@ class InnerShiftTripleFunction(torch.autograd.Function):
         Nonparm = Modified_NonparametricShift()
         ctx.shift_offsets = []
 
+        # For random mask guide shift, using the shift matrix comes from decoder feature.
         for idx in range(ctx.bz):
             latter = latter_all.narrow(0, idx, 1) ### encoder feature
             former = former_all.narrow(0, idx, 1) ### decoder feature
 
             #GET COSINE, RESHAPED LATTER AND ITS INDEXES
-            cosine, latter_windows, i_2, i_3, i_1, i_4 = Nonparm.cosine_similarity(former.clone().squeeze(), latter.clone().squeeze(), 1, stride, flag)
+             # For random mask guide shift, using the shift matrix comes from decoder feature.
+            cosine, _, i_2, i_3, i_1, i_4 = Nonparm.cosine_similarity(former.clone().squeeze(), former.clone().squeeze(), 1, stride, flag)
 
             ## GET INDEXES THAT MAXIMIZE COSINE SIMILARITY
             _, indexes = torch.max(cosine, dim=1)
@@ -53,6 +55,8 @@ class InnerShiftTripleFunction(torch.autograd.Function):
             non_mask_indexes = (ctx.flag == 0).nonzero()[indexes]
             ctx.ind_lst[idx][mask_indexes, non_mask_indexes] = 1
 
+            # For random mask guide shift, we need additionally construct latter_windows.
+            latter_windows = Nonparm._unfold(latter.clone().squeeze(), 1, stride).squeeze()
             # GET FINAL SHIFT FEATURE
             shift_masked_all[idx] = Nonparm._paste(latter_windows, ctx.ind_lst[idx], i_2, i_3, i_1, i_4)
 
