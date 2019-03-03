@@ -58,6 +58,36 @@ class UnetGeneratorShiftTriple(nn.Module):
     def forward(self, input):
         return self.model(input)
 
+class MultiUnetGeneratorShiftTriple(nn.Module):
+    def __init__(self, input_nc, output_nc, num_downs, opt, innerCos_list, shift_list, mask_global, ngf=64,
+                 norm_layer=nn.BatchNorm2d, use_spectral_norm=False):
+        super(MultiUnetGeneratorShiftTriple, self).__init__()
+
+        # construct unet structure
+        unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer,
+                                             innermost=True, use_spectral_norm=use_spectral_norm)
+        print(unet_block)
+        for i in range(num_downs - 5):  # The innner layers number is 3 (sptial size:512*512), if unet_256.
+            unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=unet_block,
+                                                 norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
+        unet_shift_block = UnetSkipConnectionShiftBlock(ngf * 4, ngf * 8, opt, innerCos_list, shift_list,
+                                                                    mask_global, input_nc=None, \
+                                                                    submodule=unet_block,
+                                                                    norm_layer=norm_layer, use_spectral_norm=use_spectral_norm, layer_to_last=4)  # passing in unet_shift_block
+
+        unet_shift_block = UnetSkipConnectionShiftBlock(ngf * 2, ngf * 4, opt, innerCos_list, shift_list,
+                                                                    mask_global, input_nc=None, \
+                                                                    submodule=unet_shift_block,
+                                                                    norm_layer=norm_layer, use_spectral_norm=use_spectral_norm, layer_to_last=3)  # passing in unet_shift_block
+        unet_block = UnetSkipConnectionBlock(ngf, ngf * 2, input_nc=None, submodule=unet_shift_block,
+                                             norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
+        unet_block = UnetSkipConnectionBlock(output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True,
+                                             norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
+
+        self.model = unet_block
+
+    def forward(self, input):
+        return self.model(input)
 
 # Mention: the TripleBlock differs in `upconv` defination.
 # 'cos' means that we add a `innerCos` layer in the block.

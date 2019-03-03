@@ -93,6 +93,9 @@ def define_G(input_nc, output_nc, ngf, which_model_netG, opt, mask_global, norm=
     elif which_model_netG == 'unet_shift_triple':
         netG = UnetGeneratorShiftTriple(input_nc, output_nc, 8, opt, innerCos_list, shift_list, mask_global, \
                                                          ngf, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
+    elif which_model_netG == 'multi_unet_shift_triple':
+        netG = MultiUnetGeneratorShiftTriple(input_nc, output_nc, 8, opt, innerCos_list, shift_list, mask_global, \
+                                                         ngf, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
     elif which_model_netG == 'res_unet_shift_triple':
         netG = ResUnetGeneratorShiftTriple(input_nc, output_nc, 8, opt, innerCos_list, shift_list, mask_global, \
                                                          ngf, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
