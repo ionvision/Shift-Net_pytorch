@@ -12,7 +12,7 @@ def get_norm_layer(norm_type='instance'):
     if norm_type == 'batch':
         norm_layer = functools.partial(nn.BatchNorm2d, affine=True, track_running_stats=True)
     elif norm_type == 'instance':
-        norm_layer = functools.partial(nn.InstanceNorm2d, affine=True, track_running_stats=False)
+        norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
     elif norm_type == 'none':
         norm_layer = None
     else:
@@ -116,6 +116,9 @@ def define_G(input_nc, output_nc, ngf, which_model_netG, opt, mask_global, norm=
     print('Shift in netG:')
     print(shift_list)
 
+    print('NetG: ')
+    print(netG)
+
     return init_net(netG, init_type, init_gain, gpu_ids), innerCos_list, shift_list
 
 
@@ -136,5 +139,8 @@ def define_D(input_nc, ndf, which_model_netD,
     else:
         print('Discriminator model name [%s] is not recognized' %
               which_model_netD)
+    
+    print('NetD:')
+    print(netD)
     return init_net(netD, init_type, init_gain, gpu_ids)
 

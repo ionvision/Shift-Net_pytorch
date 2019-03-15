@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import functools
 import torch.nn.functional as F
 
 # For original shift
@@ -67,11 +68,15 @@ class UnetSkipConnectionShiftBlock(nn.Module):
                  use_spectral_norm=False, layer_to_last=3):
         super(UnetSkipConnectionShiftBlock, self).__init__()
         self.outermost = outermost
+        if type(norm_layer) == functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
         if input_nc is None:
             input_nc = outer_nc
 
         downconv = spectral_norm(nn.Conv2d(input_nc, inner_nc, kernel_size=4,
-                             stride=2, padding=1), use_spectral_norm)
+                             stride=2, padding=1, bias=use_bias), use_spectral_norm)
         downrelu = nn.LeakyReLU(0.2, True)
         downnorm = norm_layer(inner_nc)
         uprelu = nn.ReLU(True)
@@ -104,7 +109,7 @@ class UnetSkipConnectionShiftBlock(nn.Module):
         elif innermost:
             upconv = spectral_norm(nn.ConvTranspose2d(inner_nc, outer_nc,
                                         kernel_size=4, stride=2,
-                                        padding=1), use_spectral_norm)
+                                        padding=1, bias=use_bias), use_spectral_norm)
             down = [downrelu, downconv]  # for the innermost, no submodule, and delete the bn
             up = [uprelu, upconv, upnorm]
             model = down + up
@@ -113,7 +118,7 @@ class UnetSkipConnectionShiftBlock(nn.Module):
             # shift triple differs in here. It is `*3` not `*2`.
             upconv = spectral_norm(nn.ConvTranspose2d(inner_nc * 3, outer_nc,
                                         kernel_size=4, stride=2,
-                                        padding=1), use_spectral_norm)
+                                        padding=1, bias=use_bias), use_spectral_norm)
             down = [downrelu, downconv, downnorm]
             # shift should be placed after uprelu
             # NB: innerCos are placed before shift. So need to add the latent gredient to
