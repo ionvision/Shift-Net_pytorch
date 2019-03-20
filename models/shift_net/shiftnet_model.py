@@ -64,7 +64,6 @@ class ShiftNetModel(BaseModel):
         # added for wgan-gp
         if opt.gan_type == 'wgan_gp':
             self.gp_lambda = opt.gp_lambda
-            self.ncritic = opt.ncritic
             self.wgan_gp = True
 
 
@@ -214,8 +213,8 @@ class ShiftNetModel(BaseModel):
         self.pred_real = self.netD(real_B)
 
         if self.wgan_gp:
-            self.loss_D_fake = torch.mean(self.pred_fake)
-            self.loss_D_real = torch.mean(self.pred_real)
+            self.loss_D_fake = torch.mean(1 + self.pred_fake)
+            self.loss_D_real = torch.mean(1 - self.pred_real)
 
             # calculate gradient penalty
             alpha = torch.rand(real_B.size()).to(self.device)
@@ -294,7 +293,7 @@ class ShiftNetModel(BaseModel):
             self.loss_G_L1_m += self.criterionL1_mask(mask_patch_fake, mask_patch_real)*self.opt.mask_weight
 
         if self.wgan_gp:
-            self.loss_G = self.loss_G_L1 + self.loss_G_L1_m - self.loss_G_GAN * self.opt.gan_weight
+            self.loss_G = self.loss_G_L1 + self.loss_G_L1_m - self.loss_G_GAN * self.opt.gan_weight + 0.1 * torch.mean(pred_fake**2)
         else:
             self.loss_G = self.loss_G_L1 + self.loss_G_L1_m + self.loss_G_GAN * self.opt.gan_weight
 
@@ -310,15 +309,11 @@ class ShiftNetModel(BaseModel):
 
     def optimize_parameters(self):
         self.forward()
-        # for other type of GAN, ncritic = 1.
-        if not self.wgan_gp:
-            self.ncritic = 1
         # update D
         self.set_requires_grad(self.netD, True)
-        for i in range(self.ncritic):
-            self.optimizer_D.zero_grad()
-            self.backward_D()
-            self.optimizer_D.step()
+        self.optimizer_D.zero_grad()
+        self.backward_D()
+        self.optimizer_D.step()
 
         # update G
         self.set_requires_grad(self.netD, False)
