@@ -16,7 +16,7 @@ class BaseOptions():
         parser.add_argument('--output_nc', type=int, default=3, help='# of output image channels')
         parser.add_argument('--ngf', type=int, default=64, help='# of gen filters in first conv layer')
         parser.add_argument('--ndf', type=int, default=64, help='# of discrim filters in first conv layer')
-        parser.add_argument('--which_model_netD', type=str, default='densenet', help='selects model to use for netD, [basic|densenet]')
+        parser.add_argument('--which_model_netD', type=str, default='basic', help='selects model to use for netD, [basic|densenet]')
         parser.add_argument('--which_model_netG', type=str, default='unet_shift_triple', help='selects model to use for netG [unet_256| unet_shift_triple| \
                                                                 res_unet_shift_triple|soft_unet_shift_triple|patch_soft_unet_shift_triple|res_patch_soft_unet_shift_triple]')
         parser.add_argument('--model', type=str, default='shiftnet', \

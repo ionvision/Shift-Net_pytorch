@@ -457,10 +457,17 @@ def make_color_wheel():
     return colorwheel
 
 class Discounted_L1(nn.Module):
-    def __init__(self, opt):
+    def __init__(self, opt, discounting_area='half'):
         super(Discounted_L1, self).__init__()
         # Register discounting template as a buffer
-        self.register_buffer('discounting_mask', torch.tensor(spatial_discounting_mask(opt.fineSize//2 - opt.overlap * 2, opt.fineSize//2 - opt.overlap * 2, 0.9, opt.discounting)))
+        if discounting_area == 'half':
+            self.dis_tensor = torch.tensor(spatial_discounting_mask(opt.fineSize//2 - opt.overlap * 2, opt.fineSize//2 - opt.overlap * 2, 0.9, opt.discounting))
+        elif discounting_area == 'quarter':
+            self.dis_tensor = torch.tensor(spatial_discounting_mask(opt.fineSize//4, opt.fineSize//4, 0.9, opt.discounting))
+        else:
+            raise NotImplementedError('Unrecognized discounting area ', discounting_area)
+    
+        self.register_buffer('discounting_mask', self.dis_tensor)
         self.L1 = nn.L1Loss()
 
     def forward(self, input, target):
