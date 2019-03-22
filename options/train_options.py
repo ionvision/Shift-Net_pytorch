@@ -5,7 +5,7 @@ from .base_options import BaseOptions
 class TrainOptions(BaseOptions):
     def initialize(self, parser):
         parser = BaseOptions.initialize(self, parser)
-        parser.add_argument('--display_freq', type=int, default=100, help='frequency of showing training results on screen')
+        parser.add_argument('--display_freq', type=int, default=800, help='frequency of showing training results on screen')
         parser.add_argument('--display_ncols', type=int, default=5, help='if positive, display all images in a single visdom web panel with certain number of images per row.')
         parser.add_argument('--display_env', type=str, default='main', help='visdom display environment name (default is "main")')
         parser.add_argument('--display_id', type=int, default=1, help='window id of the web display')

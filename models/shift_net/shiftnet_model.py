@@ -210,11 +210,11 @@ class ShiftNetModel(BaseModel):
                                             self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]  
 
         self.pred_fake = self.netD(fake_B.detach())
-        self.pred_real = self.netD(real_B)
+        self.pred_real = self.netD(real_B) 
 
         if self.wgan_gp:
-            self.loss_D_fake = torch.mean(1 + self.pred_fake)
-            self.loss_D_real = torch.mean(1 - self.pred_real)
+            self.loss_D_fake = torch.mean(self.pred_fake)
+            self.loss_D_real = torch.mean(self.pred_real)
 
             # calculate gradient penalty
             alpha = torch.rand(real_B.size()).to(self.device)
