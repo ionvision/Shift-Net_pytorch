@@ -9,14 +9,13 @@ import os
 import numpy as np
 from PIL import Image
 
-
-
 # Two shifts: the latter shift concontrates on the 1/4 of the region of square mask.
-# 
+# This branch is:
+#   G_f, D_f: initilized with pretrained weights.  They are fixed all the time.
+#   G_l and G_f are initlized with random weights, and only train these models.
 class ShiftNetModel(BaseModel):
     def name(self):
         return 'ShiftNetModel'
-
 
     def create_random_mask(self):
         if self.mask_type == 'random':
@@ -61,7 +60,6 @@ class ShiftNetModel(BaseModel):
                                 int(self.opt.fineSize/4) + self.opt.overlap: int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap] = 1
 
         self.mask_type = opt.mask_type
-        self.gMask_opts = {}
 
 
         self.wgan_gp = False
@@ -69,7 +67,6 @@ class ShiftNetModel(BaseModel):
         if opt.gan_type == 'wgan_gp':
             self.gp_lambda = opt.gp_lambda
             self.wgan_gp = True
-
 
         if len(opt.gpu_ids) > 0:
             self.use_gpu = True
@@ -100,6 +97,9 @@ class ShiftNetModel(BaseModel):
                                           opt.n_layers_D, opt.norm, use_sigmoid, opt.use_spectral_norm_D, opt.init_type, self.gpu_ids, opt.init_gain)
 
         if self.isTrain:
+            # Load weights of pretrain models to initilize G_f and D_f.
+            self.load_networks_sp('30', os.getcwd()+'/pretrained_models/local_D_center_sn', ['G_f', 'D_f'])
+            
             self.old_lr = opt.lr
             # define loss functions
             self.criterionGAN_f = networks.GANLoss(gan_type=opt.gan_type).to(self.device)
@@ -162,8 +162,6 @@ class ShiftNetModel(BaseModel):
             self.mask_global = Image.open(os.path.join('masks', os.path.splitext(os.path.basename(self.image_paths[0]))[0]+'_mask.png'))
             self.mask_global = transforms.ToTensor()(self.mask_global).unsqueeze(0).type_as(real_A).byte()
             
-
-
         self.set_latent_mask(self.mask_global)
 
         real_A.narrow(1,0,1).masked_fill_(self.mask_global, 0.)#2*123.0/255.0 - 1.0
@@ -186,7 +184,7 @@ class ShiftNetModel(BaseModel):
             ng_shift.set_mask(mask_global)
         for ng_innerCos in self.ng_innerCos_list_f: # ITERATE OVER THE LIST OF ng_innerCos_list:
             ng_innerCos.set_mask(mask_global)
-        for ng_innerCos in self.ng_innerCos_list_f: # ITERATE OVER THE LIST OF ng_innerCos_list:
+        for ng_innerCos in self.ng_innerCos_list_l: # ITERATE OVER THE LIST OF ng_innerCos_list:
             ng_innerCos.set_mask(mask_global)
 
     def set_gt_latent(self):

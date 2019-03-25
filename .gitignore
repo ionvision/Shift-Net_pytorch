@@ -1,10 +1,12 @@
 *.JPG
 *.png
+*.pth
 *.jpg
 *.txt
 datasets/
 checkpoints/
 output/
+pretrained_models/
 results/
 .vscode/
 log/
@@ -14,3 +16,4 @@ logs/
 .idea/
 *-checkpoint.py
 *.ipynb_checkpoints/
+
