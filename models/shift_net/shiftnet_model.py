@@ -329,17 +329,19 @@ class ShiftNetModel(BaseModel):
         # If we change the mask as 'center with random position', then we can replacing loss_G_L1_m with 'Discounted L1'.
         self.loss_G_L1_f, self.loss_G_L1_m_f, self.loss_G_L1_l, self.loss_G_L1_m_l = 0, 0, 0, 0
         # self.loss_G_L1_f += self.criterionL1_f(fake_B_f, real_B_f) * self.opt.lambda_A
-        self.loss_G_L1_l += self.criterionL1_l(fake_B_l, real_B_l) * self.opt.lambda_A
+
+        # **Mention**: Using self.fake_B_l instead of fake_B_l for L1 loss.
+        self.loss_G_L1_l += self.criterionL1_l(self.fake_B_l, self.real_B) * self.opt.lambda_A
         # calcuate mask construction loss
         # When mask_type is 'center' or 'random_with_rect', we can add additonal mask region construction loss (traditional L1).
         # Only when 'discounting_loss' is 1, then the mask region construction loss changes to 'discounting L1' instead of normal L1.
         if self.opt.mask_type == 'center' or self.opt.mask_sub_type == 'rect': 
-            mask_patch_fake_f = self.fake_B_f[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
-                                                self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
+            # mask_patch_fake_f = self.fake_B_f[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
+            #                                     self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
             mask_patch_fake_l = self.fake_B_l[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
                                            self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]
-            mask_patch_real_f = self.real_B[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
-                                        self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
+            # mask_patch_real_f = self.real_B[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
+            #                             self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
             mask_patch_real_l = self.real_B[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
                                            self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]
             # Using Discounting L1 loss
@@ -370,7 +372,7 @@ class ShiftNetModel(BaseModel):
     def optimize_parameters(self):
         self.forward()
         # update D
-        self.set_requires_grad(self.netD_f, True)
+        # self.set_requires_grad(self.netD_f, True)
         self.set_requires_grad(self.netD_l, True)
         # self.optimizer_D_f.zero_grad()
         self.optimizer_D_l.zero_grad()
@@ -379,7 +381,7 @@ class ShiftNetModel(BaseModel):
         self.optimizer_D_l.step()
 
         # update G
-        self.set_requires_grad(self.netD_f, False)
+        # self.set_requires_grad(self.netD_f, False)
         self.set_requires_grad(self.netD_l, False)
         # self.optimizer_G_f.zero_grad()
         self.optimizer_G_l.zero_grad()
