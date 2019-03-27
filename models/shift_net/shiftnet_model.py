@@ -9,6 +9,9 @@ import os
 import numpy as np
 from PIL import Image
 
+
+# Directly using two Ds.
+# The little D aims to discriminate 1/4 of masked region.
 class ShiftNetModel(BaseModel):
     def name(self):
         return 'ShiftNetModel'
@@ -34,7 +37,7 @@ class ShiftNetModel(BaseModel):
         self.opt = opt
         self.isTrain = opt.isTrain
         # specify the training losses you want to print out. The program will call base_model.get_current_losses
-        self.loss_names = ['G_GAN', 'G_L1', 'D']
+        self.loss_names = ['G_GAN', 'G_L1', 'D', 'D_l']
         # specify the images you want to save/display. The program will call base_model.get_current_visuals
         if self.opt.show_flow:
             self.visual_names = ['real_A', 'fake_B', 'real_B', 'flow_srcs']
@@ -42,7 +45,7 @@ class ShiftNetModel(BaseModel):
             self.visual_names = ['real_A', 'fake_B', 'real_B']
         # specify the models you want to save to the disk. The program will call base_model.save_networks and base_model.load_networks
         if self.isTrain:
-            self.model_names = ['G', 'D']
+            self.model_names = ['G', 'D', 'D_l']
         else:  # during test time, only load Gs
             self.model_names = ['G']
 
@@ -87,11 +90,15 @@ class ShiftNetModel(BaseModel):
             self.netD = networks.define_D(opt.input_nc, opt.ndf,
                                           opt.which_model_netD,
                                           opt.n_layers_D, opt.norm, use_sigmoid, opt.use_spectral_norm_D, opt.init_type, self.gpu_ids, opt.init_gain)
+            self.netD_l = networks.define_D(opt.input_nc, opt.ndf,
+                                          opt.which_model_netD,
+                                          opt.n_layers_D, opt.norm, use_sigmoid, opt.use_spectral_norm_D, opt.init_type, self.gpu_ids, opt.init_gain)
 
         if self.isTrain:
             self.old_lr = opt.lr
             # define loss functions
             self.criterionGAN = networks.GANLoss(gan_type=opt.gan_type).to(self.device)
+            self.criterionGAN_l = networks.GANLoss(gan_type=opt.gan_type).to(self.device)
             self.criterionL1 = torch.nn.L1Loss()
             self.criterionL1_mask = util.Discounted_L1(opt).to(self.device) # make weights/buffers transfer to the correct device
 
@@ -109,8 +116,11 @@ class ShiftNetModel(BaseModel):
                                                     lr=opt.lr, betas=(opt.beta1, 0.999))
                 self.optimizer_D = torch.optim.Adam(self.netD.parameters(),
                                                     lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_D_l = torch.optim.Adam(self.netD_l.parameters(),
+                                                    lr=opt.lr, betas=(opt.beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_D)
+            self.optimizers.append(self.optimizer_D_l)
             for optimizer in self.optimizers:
                 self.schedulers.append(networks.get_scheduler(optimizer, opt))
 
@@ -204,12 +214,17 @@ class ShiftNetModel(BaseModel):
             # Using the cropped fake_B as the input of D.
             fake_B = self.fake_B[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
                                             self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
-
+            fake_B_l = self.fake_B[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
+                                            self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]
             real_B = self.real_B[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
-                                            self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]  
+                                            self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
+            real_B_l = self.real_B[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
+                                    self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]  
 
         self.pred_fake = self.netD(fake_B.detach())
         self.pred_real = self.netD(real_B)
+        self.pred_fake_l = self.netD_l(fake_B_l.detach())
+        self.pred_real_l = self.netD_l(real_B_l)
 
         if self.wgan_gp:
             self.loss_D_fake = torch.mean(self.pred_fake)
@@ -232,8 +247,11 @@ class ShiftNetModel(BaseModel):
             if self.opt.gan_type in ['vanilla', 'lsgan']:
                 self.loss_D_fake = self.criterionGAN(self.pred_fake, False)
                 self.loss_D_real = self.criterionGAN (self.pred_real, True)
+                self.loss_D_fake_l = self.criterionGAN(self.pred_fake_l, False)
+                self.loss_D_real_l = self.criterionGAN (self.pred_real_l, True)
 
                 self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
+                self.loss_D_l = (self.loss_D_fake_l + self.loss_D_real_l) * 0.5
 
             elif self.opt.gan_type == 're_s_gan':
                 self.loss_D = self.criterionGAN(self.pred_real - self.pred_fake, True)
@@ -246,6 +264,7 @@ class ShiftNetModel(BaseModel):
             self.loss_D.backward(retain_graph=True)
         else:
             self.loss_D.backward()
+            self.loss_D_l.backward()
 
 
     def backward_G(self):
@@ -256,9 +275,14 @@ class ShiftNetModel(BaseModel):
         # Using the cropped fake_B as the input of D.
             fake_B = self.fake_B[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
                                             self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
+            fake_B_l = self.fake_B[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
+                                            self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]
             real_B = self.real_B[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
-                                            self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]                                            
+                                            self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
+            real_B_l = self.real_B[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
+                                    self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]                                             
         pred_fake = self.netD(fake_B)
+        pred_fake_l = self.netD_l(fake_B_l)
 
 
         if self.wgan_gp:
@@ -266,6 +290,7 @@ class ShiftNetModel(BaseModel):
         else:
             if self.opt.gan_type in ['vanilla', 'lsgan']:
                 self.loss_G_GAN = self.criterionGAN(pred_fake, True)
+                self.loss_G_GAN_l = self.criterionGAN(pred_fake_l, True)
 
             elif self.opt.gan_type == 're_s_gan':
                 pred_real = self.netD (real_B)
@@ -294,7 +319,7 @@ class ShiftNetModel(BaseModel):
         if self.wgan_gp:
             self.loss_G = self.loss_G_L1 + self.loss_G_L1_m - self.loss_G_GAN * self.opt.gan_weight
         else:
-            self.loss_G = self.loss_G_L1 + self.loss_G_L1_m + self.loss_G_GAN * self.opt.gan_weight
+            self.loss_G = self.loss_G_L1 + self.loss_G_L1_m + self.loss_G_GAN * self.opt.gan_weight + self.loss_G_GAN_l * self.opt.gan_weight_l
 
 
         # Third add additional netG contraint loss!
@@ -310,12 +335,16 @@ class ShiftNetModel(BaseModel):
         self.forward()
         # update D
         self.set_requires_grad(self.netD, True)
+        self.set_requires_grad(self.netD_l, True)
         self.optimizer_D.zero_grad()
+        self.optimizer_D_l.zero_grad()
         self.backward_D()
         self.optimizer_D.step()
+        self.optimizer_D_l.step()
 
         # update G
         self.set_requires_grad(self.netD, False)
+        self.set_requires_grad(self.netD_l, False)
         self.optimizer_G.zero_grad()
         self.backward_G()
         self.optimizer_G.step()

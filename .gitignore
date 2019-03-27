@@ -14,3 +14,4 @@ logs/
 .idea/
 *-checkpoint.py
 *.ipynb_checkpoints/
+pretrained_models/
