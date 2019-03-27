@@ -326,8 +326,8 @@ class ShiftNetModel(BaseModel):
 
         # If we change the mask as 'center with random position', then we can replacing loss_G_L1_m with 'Discounted L1'.
         self.loss_G_L1_f, self.loss_G_L1_m_f, self.loss_G_L1_l, self.loss_G_L1_m_l = 0, 0, 0, 0
-        self.loss_G_L1_f += self.criterionL1_f(fake_B_f, real_B_f) * self.opt.lambda_A
-        self.loss_G_L1_l += self.criterionL1_l(fake_B_l, real_B_l) * self.opt.lambda_A
+        self.loss_G_L1_f += self.criterionL1_f(self.fake_B_f, self.real_B) * self.opt.lambda_A
+        self.loss_G_L1_l += self.criterionL1_l(self.fake_B_l, self.real_B) * self.opt.lambda_A
         # calcuate mask construction loss
         # When mask_type is 'center' or 'random_with_rect', we can add additonal mask region construction loss (traditional L1).
         # Only when 'discounting_loss' is 1, then the mask region construction loss changes to 'discounting L1' instead of normal L1.
