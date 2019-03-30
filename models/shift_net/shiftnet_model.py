@@ -154,7 +154,13 @@ class ShiftNetModel(BaseModel):
             self.mask_global.zero_()
             self.mask_global[:, :, int(self.opt.fineSize/4) + self.opt.overlap : int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap,\
                                 int(self.opt.fineSize/4) + self.opt.overlap: int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap] = 1
+        
             self.rand_t, self.rand_l = int(self.opt.fineSize/4) + self.opt.overlap, int(self.opt.fineSize/4) + self.opt.overlap
+
+            self.mask_quarter = self.mask_global.clone().zero_()
+            self.mask_quarter[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
+                                           self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8] = 1
+            
         elif self.opt.mask_type == 'random':
             self.mask_global = self.create_random_mask().type_as(self.mask_global).view_as(self.mask_global)
         else:
@@ -165,6 +171,7 @@ class ShiftNetModel(BaseModel):
             self.mask_global = transforms.ToTensor()(self.mask_global).unsqueeze(0).type_as(real_A).byte()
             
         self.set_latent_mask(self.mask_global)
+        self.set_latent_mask_quarter(self.mask_quarter)
 
         real_A.narrow(1,0,1).masked_fill_(self.mask_global, 0.)#2*123.0/255.0 - 1.0
         real_A.narrow(1,1,1).masked_fill_(self.mask_global, 0.)#2*104.0/255.0 - 1.0
@@ -182,12 +189,15 @@ class ShiftNetModel(BaseModel):
     def set_latent_mask(self, mask_global):
         for ng_shift in self.ng_shift_list_f: # ITERATE OVER THE LIST OF ng_shift_list
             ng_shift.set_mask(mask_global)
-        for ng_shift in self.ng_shift_list_l: # ITERATE OVER THE LIST OF ng_shift_list
-            ng_shift.set_mask(mask_global)
         for ng_innerCos in self.ng_innerCos_list_f: # ITERATE OVER THE LIST OF ng_innerCos_list:
             ng_innerCos.set_mask(mask_global)
+
+    def set_latent_mask_quarter(self, mask_quarter):
+        for ng_shift in self.ng_shift_list_l: # ITERATE OVER THE LIST OF ng_shift_list
+            ng_shift.set_mask(mask_quarter)
+
         for ng_innerCos in self.ng_innerCos_list_l: # ITERATE OVER THE LIST OF ng_innerCos_list:
-            ng_innerCos.set_mask(mask_global)
+            ng_innerCos.set_mask(mask_quarter)
 
     def set_gt_latent(self):
         if not self.opt.skip:
@@ -203,8 +213,11 @@ class ShiftNetModel(BaseModel):
 
     def forward(self):
         self.fake_B_f = self.netG_f(self.real_A)
-        # concat a mask with self.fake_B_f
-        self.fake_B_f_c = torch.cat((self.fake_B_f, (1 - self.mask_global).expand(self.real_A.size(0), 1, self.real_A.size(2), self.real_A.size(3)).type_as(self.real_A)), dim=1)
+        # masked the region of generated ouput of the first phase
+        self.fake_B_f_m = self.fake_B_f * (1. - self.mask_quarter.float()).expand(*self.fake_B_f.size())
+
+        # concat the quarter mask with self.fake_B_f
+        self.fake_B_f_c = torch.cat((self.fake_B_f_m, (1 - self.mask_quarter).expand(self.real_A.size(0), 1, self.real_A.size(2), self.real_A.size(3)).type_as(self.real_A)), dim=1)
         self.fake_B_l = self.netG_l(self.fake_B_f_c)
 
     # Just assume one shift layer.
