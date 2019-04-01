@@ -180,7 +180,7 @@ class ShiftNetModel(BaseModel):
         if self.opt.add_mask2input:
             # make it 4 dimensions.
             # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
-            real_A = torch.cat((real_A, (1 - self.mask_global).expand(real_A.size(0), 1, real_A.size(2), real_A.size(3)).type_as(real_A)), dim=1)
+            real_A = torch.cat((real_A, (1. - self.mask_global).expand(real_A.size(0), 1, real_A.size(2), real_A.size(3)).type_as(real_A)), dim=1)
 
         self.real_A = real_A
         self.real_B = real_B
@@ -204,7 +204,7 @@ class ShiftNetModel(BaseModel):
             if self.opt.add_mask2input:
                 # make it 4 dimensions.
                 # Mention: the extra dim, the masked part is filled with 0, non-mask part is filled with 1.
-                real_B = torch.cat([self.real_B, (1 - self.mask_global).expand(self.real_B.size(0), 1, self.real_B.size(2), self.real_B.size(3)).type_as(self.real_B)], dim=1)
+                real_B = torch.cat([self.real_B, (1. - self.mask_global).expand(self.real_B.size(0), 1, self.real_B.size(2), self.real_B.size(3)).type_as(self.real_B)], dim=1)
             else:
                 real_B = self.real_B
             self.netG_f(real_B) # input ground truth
@@ -217,7 +217,7 @@ class ShiftNetModel(BaseModel):
         self.fake_B_f_m = self.fake_B_f * (1. - self.mask_quarter.float()).expand(*self.fake_B_f.size())
 
         # concat the quarter mask with self.fake_B_f
-        self.fake_B_f_c = torch.cat((self.fake_B_f_m, (1 - self.mask_quarter).expand(self.real_A.size(0), 1, self.real_A.size(2), self.real_A.size(3)).type_as(self.real_A)), dim=1)
+        self.fake_B_f_c = torch.cat((self.fake_B_f_m, (1. - self.mask_quarter).expand(self.real_A.size(0), 1, self.real_A.size(2), self.real_A.size(3)).type_as(self.real_A)), dim=1)
         self.fake_B_l = self.netG_l(self.fake_B_f_c)
 
     # Just assume one shift layer.
