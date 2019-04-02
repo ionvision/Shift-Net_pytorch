@@ -38,8 +38,8 @@ class ShiftNetModel(BaseModel):
         self.opt = opt
         self.isTrain = opt.isTrain
         # specify the training losses you want to print out. The program will call base_model.get_current_losses
-        # self.loss_names = ['G_GAN_f', 'G_GAN_l', 'G_L1_f', 'G_L1_l']
-        self.loss_names = ['G_GAN_l', 'G_L1_l']
+        self.loss_names = ['G_GAN_f', 'G_GAN_l', 'G_L1_f', 'G_L1_l']
+        # self.loss_names = ['G_GAN_l', 'G_L1_l']
         # specify the images you want to save/display. The program will call base_model.get_current_visuals
         if self.opt.show_flow:
             self.visual_names = ['real_A', 'fake_B_f', 'fake_B_l', 'real_B', 'flow_srcs']
@@ -100,13 +100,13 @@ class ShiftNetModel(BaseModel):
 
         if self.isTrain:
             # Load weights of pretrain models to initilize G_f and D_f.
-            self.load_networks_sp('30', os.getcwd()+'/pretrained_models/local_D_center_sn', ['G_f', 'D_f'])
+            self.load_networks_sp('30', os.getcwd()+'/pretrained_models/two_latter', ['G_f', 'D_f', 'G_l', 'D_l'])
             
             self.old_lr = opt.lr
             # define loss functions
-            # self.criterionGAN_f = networks.GANLoss(gan_type=opt.gan_type).to(self.device)
-            # self.criterionL1_f = torch.nn.L1Loss()
-            # self.criterionL1_mask_f = util.Discounted_L1(opt).to(self.device) # make weights/buffers transfer to the correct device
+            self.criterionGAN_f = networks.GANLoss(gan_type=opt.gan_type).to(self.device)
+            self.criterionL1_f = torch.nn.L1Loss()
+            self.criterionL1_mask_f = util.Discounted_L1(opt).to(self.device) # make weights/buffers transfer to the correct device
             self.criterionGAN_l = networks.GANLoss(gan_type=opt.gan_type).to(self.device)
             self.criterionL1_l = torch.nn.L1Loss()
             self.criterionL1_mask_l = util.Discounted_L1(opt, 'quarter').to(self.device) # make weights/buffers transfer to the correct device
@@ -124,16 +124,16 @@ class ShiftNetModel(BaseModel):
                 self.optimizer_D_l = torch.optim.Adam(self.netD_l.parameters(),
                                                     lr=opt.lr, betas=(opt.beta1, 0.999))
             else:
-                # self.optimizer_G_f = torch.optim.Adam(self.netG_f.parameters(),
-                #                                     lr=opt.lr, betas=(opt.beta1, 0.999))
-                # self.optimizer_D_f = torch.optim.Adam(self.netD_f.parameters(),
-                #                                     lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_G_f = torch.optim.Adam(self.netG_f.parameters(),
+                                                    lr=opt.lr, betas=(opt.beta1, 0.999))
+                self.optimizer_D_f = torch.optim.Adam(self.netD_f.parameters(),
+                                                    lr=opt.lr, betas=(opt.beta1, 0.999))
                 self.optimizer_G_l = torch.optim.Adam(self.netG_l.parameters(),
                                                     lr=opt.lr, betas=(opt.beta1, 0.999))
                 self.optimizer_D_l = torch.optim.Adam(self.netD_l.parameters(),
                                                     lr=opt.lr, betas=(opt.beta1, 0.999))
-            # self.optimizers.append(self.optimizer_G_f)
-            # self.optimizers.append(self.optimizer_D_f)
+            self.optimizers.append(self.optimizer_G_f)
+            self.optimizers.append(self.optimizer_D_f)
             self.optimizers.append(self.optimizer_G_l)
             self.optimizers.append(self.optimizer_D_l)
             for optimizer in self.optimizers:
@@ -255,8 +255,8 @@ class ShiftNetModel(BaseModel):
             real_B_l = self.real_B[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
                                            self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]
 
-        # self.pred_fake_f = self.netD_f(fake_B_f.detach())
-        # self.pred_real_f = self.netD_f(real_B_f) # 120*120
+        self.pred_fake_f = self.netD_f(fake_B_f.detach())
+        self.pred_real_f = self.netD_f(real_B_f) # 120*120
         self.pred_fake_l = self.netD_l(fake_B_l.detach())
         self.pred_real_l = self.netD_l(real_B_l) # 64*64
 
@@ -280,12 +280,12 @@ class ShiftNetModel(BaseModel):
         else:
 
             if self.opt.gan_type in ['vanilla', 'lsgan']:
-                # self.loss_D_fake_f = self.criterionGAN_f(self.pred_fake_f, False)
-                # self.loss_D_real_f = self.criterionGAN_f (self.pred_real_f, True)
+                self.loss_D_fake_f = self.criterionGAN_f(self.pred_fake_f, False)
+                self.loss_D_real_f = self.criterionGAN_f (self.pred_real_f, True)
                 self.loss_D_fake_l = self.criterionGAN_l(self.pred_fake_l, False)
                 self.loss_D_real_l = self.criterionGAN_l (self.pred_real_l, True)
 
-                # self.loss_D_f = (self.loss_D_fake_f + self.loss_D_real_f) * 0.5
+                self.loss_D_f = (self.loss_D_fake_f + self.loss_D_real_f) * 0.5
                 self.loss_D_l = (self.loss_D_fake_l + self.loss_D_real_l) * 0.5
 
             elif self.opt.gan_type == 're_s_gan':
@@ -299,7 +299,7 @@ class ShiftNetModel(BaseModel):
             self.loss_D.backward(retain_graph=True)
         else:
             # Maybe we should add retain_graph.
-            # self.loss_D_f.backward()
+            self.loss_D_f.backward()
             self.loss_D_l.backward()
 
 
@@ -318,7 +318,7 @@ class ShiftNetModel(BaseModel):
                                             self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
             real_B_l = self.real_B[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
                                            self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]
-        # pred_fake_f = self.netD_f(fake_B_f)
+        pred_fake_f = self.netD_f(fake_B_f)
         pred_fake_l = self.netD_l(fake_B_l)
 
 
@@ -326,7 +326,7 @@ class ShiftNetModel(BaseModel):
             self.loss_G_GAN = torch.mean(pred_fake)
         else:
             if self.opt.gan_type in ['vanilla', 'lsgan']:
-                # self.loss_G_GAN_f = self.criterionGAN_f(pred_fake_f, True)
+                self.loss_G_GAN_f = self.criterionGAN_f(pred_fake_f, True)
                 self.loss_G_GAN_l = self.criterionGAN_l(pred_fake_l, True)
 
             elif self.opt.gan_type == 're_s_gan':
@@ -341,7 +341,7 @@ class ShiftNetModel(BaseModel):
 
         # If we change the mask as 'center with random position', then we can replacing loss_G_L1_m with 'Discounted L1'.
         self.loss_G_L1_f, self.loss_G_L1_m_f, self.loss_G_L1_l, self.loss_G_L1_m_l = 0, 0, 0, 0
-        # self.loss_G_L1_f += self.criterionL1_f(fake_B_f, real_B_f) * self.opt.lambda_A
+        self.loss_G_L1_f += self.criterionL1_f(fake_B_f, real_B_f) * self.opt.lambda_A
 
         # **Mention**: Using self.fake_B_l instead of fake_B_l for L1 loss.
         self.loss_G_L1_l += self.criterionL1_l(self.fake_B_l, self.real_B) * self.opt.lambda_A
@@ -349,22 +349,22 @@ class ShiftNetModel(BaseModel):
         # When mask_type is 'center' or 'random_with_rect', we can add additonal mask region construction loss (traditional L1).
         # Only when 'discounting_loss' is 1, then the mask region construction loss changes to 'discounting L1' instead of normal L1.
         if self.opt.mask_type == 'center' or self.opt.mask_sub_type == 'rect': 
-            # mask_patch_fake_f = self.fake_B_f[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
-            #                                     self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
+            mask_patch_fake_f = self.fake_B_f[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
+                                                self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
             mask_patch_fake_l = self.fake_B_l[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
                                            self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]
-            # mask_patch_real_f = self.real_B[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
-            #                             self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
+            mask_patch_real_f = self.real_B[:, :, self.rand_t:self.rand_t+self.opt.fineSize//2-2*self.opt.overlap, \
+                                        self.rand_l:self.rand_l+self.opt.fineSize//2-2*self.opt.overlap]
             mask_patch_real_l = self.real_B[:, :, self.rand_t + self.opt.fineSize//8:self.rand_t+self.opt.fineSize*3//8, \
                                            self.rand_l + self.opt.fineSize//8:self.rand_l+self.opt.fineSize*3//8]
             # Using Discounting L1 loss
-            # self.loss_G_L1_m_f += self.criterionL1_mask_f(mask_patch_fake_f, mask_patch_real_f)*self.opt.mask_weight
+            self.loss_G_L1_m_f += self.criterionL1_mask_f(mask_patch_fake_f, mask_patch_real_f)*self.opt.mask_weight
             self.loss_G_L1_m_l += self.criterionL1_mask_l(mask_patch_fake_l, mask_patch_real_l)*self.opt.mask_weight
 
         if self.wgan_gp:
             self.loss_G = self.loss_G_L1 + self.loss_G_L1_m - self.loss_G_GAN * self.opt.gan_weight
         else:
-            # self.loss_G_f = self.loss_G_L1_f + self.loss_G_L1_m_f + self.loss_G_GAN_f * self.opt.gan_weight
+            self.loss_G_f = self.loss_G_L1_f + self.loss_G_L1_m_f + self.loss_G_GAN_f * self.opt.gan_weight
             self.loss_G_l = self.loss_G_L1_l + self.loss_G_L1_m_l + self.loss_G_GAN_l * self.opt.gan_weight
 
 
@@ -372,34 +372,34 @@ class ShiftNetModel(BaseModel):
         self.ng_loss_value_f = 0
         self.ng_loss_value_l = 0
         if not self.opt.skip:
-            # for gl in self.ng_innerCos_list_f:
-            #     self.ng_loss_value_f += gl.loss
+            for gl in self.ng_innerCos_list_f:
+                self.ng_loss_value_f += gl.loss
             for gl in self.ng_innerCos_list_l:
                 self.ng_loss_value_l += gl.loss
-            # self.loss_G_f += self.ng_loss_value_f
+            self.loss_G_f += self.ng_loss_value_f
             self.loss_G_l += self.ng_loss_value_l
 
-        # self.loss_G_f.backward(retain_graph=True)
+        self.loss_G_f.backward(retain_graph=True)
         self.loss_G_l.backward()
 
     def optimize_parameters(self):
         self.forward()
         # update D
-        # self.set_requires_grad(self.netD_f, True)
+        self.set_requires_grad(self.netD_f, True)
         self.set_requires_grad(self.netD_l, True)
-        # self.optimizer_D_f.zero_grad()
+        self.optimizer_D_f.zero_grad()
         self.optimizer_D_l.zero_grad()
         self.backward_D()
-        # self.optimizer_D_f.step()
+        self.optimizer_D_f.step()
         self.optimizer_D_l.step()
 
         # update G
-        # self.set_requires_grad(self.netD_f, False)
+        self.set_requires_grad(self.netD_f, False)
         self.set_requires_grad(self.netD_l, False)
-        # self.optimizer_G_f.zero_grad()
+        self.optimizer_G_f.zero_grad()
         self.optimizer_G_l.zero_grad()
         self.backward_G()
-        # self.optimizer_G_f.step()
+        self.optimizer_G_f.step()
         self.optimizer_G_l.step()
 
 
