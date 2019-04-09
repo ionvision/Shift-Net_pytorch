@@ -171,7 +171,8 @@ class ShiftNetModel(BaseModel):
             self.mask_global = transforms.ToTensor()(self.mask_global).unsqueeze(0).type_as(real_A).byte()
             
         self.set_latent_mask(self.mask_global)
-        self.set_latent_mask_quarter(self.mask_quarter)
+        # Still using mask_global
+        self.set_latent_mask_quarter(self.mask_global)
 
         real_A.narrow(1,0,1).masked_fill_(self.mask_global, 0.)#2*123.0/255.0 - 1.0
         real_A.narrow(1,1,1).masked_fill_(self.mask_global, 0.)#2*104.0/255.0 - 1.0
