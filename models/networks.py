@@ -95,11 +95,21 @@ def define_G(input_nc, output_nc, ngf, which_model_netG, opt, mask_global, norm=
     elif which_model_netG == 'unet_shift_triple':
         netG = UnetGeneratorShiftTriple(input_nc, output_nc, 8, opt, innerCos_list, shift_list, mask_global, \
                                                          ngf, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
-    elif which_model_netG == 'unet_shift_triple_128':
-        netG = UnetGeneratorShiftTriple(input_nc, output_nc, 7, opt, innerCos_list, shift_list, mask_global, \
+    # shift to the 2-to-last for 128
+    elif which_model_netG == 'unet_shift_triple_128_1':
+        netG = UnetGeneratorShiftTriple_1(input_nc, output_nc, 7, opt, innerCos_list, shift_list, mask_global, \
                                                          ngf, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
-    elif which_model_netG == 'unet_shift_triple_64':
-        netG = UnetGeneratorShiftTriple(input_nc, output_nc, 6, opt, innerCos_list, shift_list, mask_global, \
+    # shift to the 4-to-last for 128
+    elif which_model_netG == 'unet_shift_triple_128_2':
+        netG = UnetGeneratorShiftTriple_2(input_nc, output_nc, 7, opt, innerCos_list, shift_list, mask_global, \
+                                                         ngf, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
+    # shift to the 2-to-last for 64
+    elif which_model_netG == 'unet_shift_triple_64_1':
+        netG = UnetGeneratorShiftTriple_1(input_nc, output_nc, 6, opt, innerCos_list, shift_list, mask_global, \
+                                                         ngf, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
+    # shift to the 4-to-last for 64
+    elif which_model_netG == 'unet_shift_triple_64_2':
+        netG = UnetGeneratorShiftTriple_2(input_nc, output_nc, 6, opt, innerCos_list, shift_list, mask_global, \
                                                          ngf, norm_layer=norm_layer, use_spectral_norm=use_spectral_norm)
     elif which_model_netG == 'res_unet_shift_triple':
         netG = ResUnetGeneratorShiftTriple(input_nc, output_nc, 8, opt, innerCos_list, shift_list, mask_global, \
