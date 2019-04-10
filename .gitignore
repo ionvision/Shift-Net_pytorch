@@ -4,6 +4,7 @@
 *.txt
 datasets/
 checkpoints/
+pretrained_models/
 output/
 results/
 .vscode/

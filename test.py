@@ -22,6 +22,11 @@ if __name__ == "__main__":
     # create website
     web_dir = os.path.join(opt.results_dir, opt.name, '%s_%s' % (opt.phase, opt.which_epoch))
     webpage = html.HTML(web_dir, 'Experiment = %s, Phase = %s, Epoch = %s' % (opt.name, opt.phase, opt.which_epoch))
+
+    # add eval(Ususally for BN training)
+    if opt.eval:
+        model.eval()
+
     # test
     for i, data in enumerate(dataset):
         if i >= opt.how_many:
