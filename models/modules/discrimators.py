@@ -8,10 +8,10 @@ from .modules import *
 class NLayerDiscriminator(nn.Module):
     def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False, use_spectral_norm=True):
         super(NLayerDiscriminator, self).__init__()
-        if type(norm_layer) == functools.partial:
-            use_bias = norm_layer.func == nn.InstanceNorm2d
+        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
+            use_bias = norm_layer.func != nn.BatchNorm2d
         else:
-            use_bias = norm_layer == nn.InstanceNorm2d
+            use_bias = norm_layer != nn.BatchNorm2d
 
         kw = 4
         padw = 1

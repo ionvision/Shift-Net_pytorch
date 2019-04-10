@@ -1,4 +1,4 @@
-# This architecture mainly try BN as the origin setting
+# This architecture mainly try BN (no Bias for G and D)
 
 # Architecutre
 <img src="architecture.png" width="1000"/> 
