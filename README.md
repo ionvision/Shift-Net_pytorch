@@ -1,3 +1,5 @@
+# This architecture mainly try BN as the origin setting
+
 # Architecutre
 <img src="architecture.png" width="1000"/> 
 
